@@ -1,0 +1,23 @@
+node_modules/
+spike/out/
+coverage/
+
+# Editor/agent-local launch config. `npm run harness` is the portable entry point.
+.claude/
+# Agent-local instructions. The rules that matter to the repo are enforced by
+# .githooks/ and documented in docs/development.md, not here.
+CLAUDE.md
+
+# Unsent draft correspondence and submission working notes — private by nature,
+# and of no use to anyone reading the repo.
+bounty-intent-email.md
+
+# Generated spike output copied to the root for convenient opening — regenerate with
+# `npm run spike:annotations`, don't commit it.
+/annotated-sample*.pdf
+.DS_Store
+*.log
+
+# dist/plugin.js is intentionally COMMITTED — the T&C requires the public repo to hold
+# the most recent version of the code, and dist/plugin.js is what actually runs in
+# Amplenote. Keeping it in the repo is what "repo and plugin page in sync" means here.

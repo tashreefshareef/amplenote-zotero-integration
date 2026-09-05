@@ -1126,7 +1126,7 @@ Practical workarounds when pasting/typing code in:
 | ~~Writing the annotated PDF back~~ | — | ✅ **Resolved and confirmed live on desktop, 2026-08-10.** Download-only: `attachNoteMedia` rejects PDFs, and §4's actual requirement is "offer a way to export/download" - upload-back was the spec's own suggestion, not the requirement. `URL.createObjectURL` + a throwaway `<a download>`, client-side in the embed, works inside Amplenote's iframe on the desktop app. **It does nothing at all in the mobile app** - no file, no error, no dialog: a `download` attribute needs the host application to handle it, and an app embedding a webview generally does not. The embed now tries the Web Share API first where it exists (how a phone saves a file anyway; it may still be refused, since Web Share must be delegated to an iframe by the host) and, failing everything, says so in the status bar rather than leaving the user waiting for a file that is never coming. |
 | ~~"Double-quoted block" markdown~~ | — | ✅ Resolved: doc 4 confirms Amplenote has no colored-link syntax — a cycle color is markdown-native, `==highlighted text<!-- {"cycleColor": "N"} -->==` (or `backgroundCycleColor`). Original implementation wrapped the link itself in the highlight span; confirmed live that a highlight/mark span and a markdown link do NOT compose at all, in either nesting order (see "A highlight/mark span cannot contain a markdown link" below). `src/export.js` now emits a colored `==●<!-- {"cycleColor":"N"} -->==` marker immediately followed by a plain `[name](url)` link, then a `> "quote"` blockquote line — confirmed live, the marker renders in color and the link stays clickable. |
 | ~~Cycle-color indices 12/14/15/18~~ | A wrong index means every exported link is the wrong color — a visible acceptance failure. | ✅ Mechanism confirmed live: distinct marker colors visibly rendered for coral and yellow in the same export (screenshot), consistent with `src/colors.js`'s mapping. Green (15) and blue (18) weren't independently pixel-checked in that pass - worth a quick glance next time either color is exported, but the mechanism itself (not just the guessed indices) is no longer in doubt. |
-| **`prompt` radio input shape** | Needed for the "which PDF?" picker. | Check doc 2's `inputs` array detail. |
+| ~~`prompt` radio input shape~~ | — | ✅ Resolved 2026-09-05 (Zotero integration project, `zotero-findings.md`). A `string` and a `select` input coexist in one `app.prompt` call; `select` renders as a real dropdown, not a degraded fallback. The return is a **positional array matching `inputs` order, plus one trailing element beyond the declared inputs** — `["thinking fast", "A", -1]` for a two-input prompt (string, select). The trailing `-1` was not requested and matches `app.alert`'s documented "`-1` for primary action" convention, so `app.prompt` appears to append an implicit action index even with no `actions` array passed. `radio` itself not separately tested — only `select` was needed and confirmed. |
 
 ## Corrections log
 
@@ -1143,3 +1143,11 @@ mock that drifts from reality makes green tests meaningless.
   "unrecognized link" popup, implying it signals a missing `linkTarget`. It doesn't: it's
   Amplenote's ordinary link-details popup (the raw href + EDIT DETAILS / CLOSE), shown for
   every link's text click regardless. `linkTarget` is fired by the puzzle-piece icon.
+- **2026-09-05** — `prompt` radio/select input shape resolved (Zotero integration
+  project). Also confirmed the mechanism, not previously documented anywhere in this file,
+  by which a brand-new note becomes an installed plugin: there is **no tag involved** —
+  Account Settings → Plugins → "Add a plugin" has a note picker; selecting a note there
+  (one with a `name` metadata row and a `# Code block` heading holding a JS expression)
+  is what registers it. The puzzle-piece icon on the note itself only appears afterward.
+  Also: editing a live plugin's source note and reloading applies the change immediately
+  (a "Plugin update installed" toast), no separate re-install step.

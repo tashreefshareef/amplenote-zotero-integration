@@ -6,14 +6,15 @@ formatted citation insertion, content sync, and annotation import.
 Built for the [Amplenote plugin bounty](https://public.amplenote.com/u1ivsVxuqee3TntAwJ5Pvca8).
 
 > **Status: pre-implementation.** Nothing is built yet. The platform research is done and
-> the four Phase 0 spikes are outstanding — see the roadmap.
+> all four Phase 0 spikes are closed, live — see `docs/zotero-findings.md`. Next is the
+> intent email, then Phase 1 (`docs/roadmap.md`).
 
 ## Start here
 
 | Document | What it is |
 |---|---|
-| [`docs/roadmap.md`](docs/roadmap.md) | The build plan, phased, with day estimates calibrated against the PDF Annotator's real git history |
-| [`docs/zotero-findings.md`](docs/zotero-findings.md) | Verified Zotero + Amplenote facts for this project, and the open spike list |
+| [`docs/roadmap.md`](docs/roadmap.md) | The build plan, phased, estimated bottom-up with fixed per-plugin overhead separated from per-feature work — and read against what the bounty actually pays |
+| [`docs/zotero-findings.md`](docs/zotero-findings.md) | Verified Zotero + Amplenote facts for this project — all four Phase 0 spikes closed live |
 | [`docs/bounty-note.md`](docs/bounty-note.md) | The bounty requirements, verbatim, including the footnote the rendered page drops |
 | [`docs/api-notes.md`](docs/api-notes.md) | Confirmed Amplenote API signatures and platform quirks. **Carried over and still living** — its "Lessons for the NEXT Amplenote plugin" section was written for this project |
 | [`docs/bugs-found.md`](docs/bugs-found.md) | General web-platform bugs and fixes. Also carried over, also still living |
@@ -23,15 +24,20 @@ Built for the [Amplenote plugin bounty](https://public.amplenote.com/u1ivsVxuqee
 - **The Zotero Web API is fully CORS-open** and exposes `Last-Modified-Version`, `Link`,
   `Backoff` and `Retry-After` to JS — so incremental sync, pagination and rate-limit
   backoff all work from inside the plugin, with the API key in a header. This was the
-  project's biggest risk and it is green.
+  project's biggest risk; confirmed live from inside a real embed, not just by `curl`.
 - **Citations render server-side** via `include=citation,bib&style=`, so no CSL engine
   ships in the bundle. That matters: a dense plugin code block costs 15–60 seconds just to
   *open* the plugin note.
 - **The Obsidian plugin the bounty names cannot be replicated** — it requires Zotero
   desktop and Better BibTeX over localhost. Parity has to be by outcome. The bounty's own
   footnote, *"Or as close as possible"*, is what licenses that.
-- **PDF attachment import may not be possible** as a real Amplenote attachment;
-  `attachNoteMedia` rejects PDFs. Annotation import does not depend on it.
+- **PDF attachment import does not work** as a real Amplenote attachment — confirmed live:
+  `attachNoteMedia` rejects PDFs, and the Zotero file endpoint redirects to storage with no
+  CORS headers, so the plugin can't read the bytes either. Degrades to a deep link into
+  Zotero's web reader. Annotation import does not depend on it and is unaffected.
+- **The citation picker needs no embed.** `app.prompt`'s `select` input, alongside a
+  `string` input in the same prompt, is a real two-step picker — confirmed live. That
+  leaves the config panel as the plugin's only embed.
 
 ## What came from the PDF Annotator
 

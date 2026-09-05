@@ -47,11 +47,14 @@ Claude or Anthropic (see `CLAUDE.md`).
 ```
 src/
   plugin.js          The plugin object — kept thin, delegates to actions/
-  constants.js        Zotero API base/version, settings-row labels
+  constants.js        Zotero API base/version, settings-row labels, default citation style
   zotero-client.js     Zotero Web API v3 client: auth header, since= pagination,
-                       Backoff/Retry-After
+                       Backoff/Retry-After, searchItems()
+  format-citation.js   Strips Zotero's citation/bib HTML to plain text
   actions/
-    test-connection.js  "Zotero: Test connection" — the Phase 1 smoke test
+    test-connection.js   "Zotero: Test connection" — the Phase 1 smoke test
+    citation-picker.js   Search Zotero, pick a result — shared by the insertText
+                         and appOption citation actions (Phase 2)
 esbuild.js            Build: src/ → dist/plugin.js
 dist/plugin.js        Build output (committed)
 test/
@@ -97,8 +100,11 @@ needs:
    | setting | Zotero API key |
 
    Use a **read-only** Zotero key (generate one at
-   <https://www.zotero.org/settings/keys>) — the settings value is visible in a metadata
-   table in your own note.
+   <https://www.zotero.org/settings/keys>). Confirmed live, 2026-09-05, contrary to what
+   the platform docs imply: the value does **not** sit inline in the note's own table —
+   the table only declares the setting's *label*. The actual value is entered and stored
+   on a separate page, **Account Settings → Plugins → [this plugin] → Settings**, which
+   only ever shows this plugin's own settings, never another installed plugin's.
 
 2. A `# Code block` heading, exactly that text — Plugin Builder's sync target looks for
    it verbatim (`esbuild.js`'s format-contract assertions cross-check this at build time,
@@ -114,3 +120,52 @@ needs:
 Then run **Zotero: Test connection** from the `/` slash-command picker in any note, with
 your key filled in. It should alert back your Zotero username, userID and access scope.
 That's the live-app check this phase ends on (`CLAUDE.md`).
+
+## Running actions live
+
+Type `/` anywhere in a note body, then filter (e.g. `/zotero`). Every action shows up
+prefixed `Plugin: <plugin name>: <label>`, grouped by kind:
+
+- **`appOption` actions** appear under "DISPLAY AND GLOBAL ACTIONS".
+- **`insertText` actions** appear under "INSERT" — this is a live, general finding, not
+  documented anywhere in `api-notes.md` before now: the `{Plugin Name}` macro syntax
+  those docs describe is not the only way to trigger one. Selecting it from the `/`
+  picker runs it exactly the same way.
+
+Two mechanics this project had marked unverified turned out fine on the first live run:
+`app.prompt` with a single `string` input returns a value the code's defensive
+`Array.isArray` check handles either way, and cancelling `insertText` mid-flow leaves no
+`"undefined"` in the note — confirmed by running the actual cancel path, not inferred.
+
+## Syncing via Plugin Builder
+
+Manually pasting `dist/plugin-paste.js` after every change works but doesn't scale.
+Plugin Builder (a separate installed plugin, same as the PDF Annotator uses) syncs the
+code block from this GitHub repo on demand:
+
+1. Add a plain-text line (**not** a heading — see below) anywhere in the note, reading:
+
+   ```
+   entry: tashreefshareef/amplenote-zotero-integration/dist/plugin.js
+   ```
+
+2. Run **Plugin Builder: Refresh** from the `/` picker.
+
+**Placement matters, confirmed live 2026-09-05: put the `entry:` line *above* the
+`# Code block` heading, never below it or inside the fenced block.** Plugin Builder
+rewrites the whole section under that heading on every sync, and if the `entry:` line
+sits there too, it gets silently wiped the first time you refresh — the next refresh
+then has nothing to find `entry:`/`repo:` from and fails. Above the heading, it survives
+indefinitely across refreshes.
+
+**A line typed at the start of a heading inherits that heading's style.** Typing the
+`entry:` line at the top of "Code block" makes it an H1 too — functionally harmless
+(Plugin Builder's regex reads note content, not formatting), but for a normal-looking
+note, click into that line afterward and toggle its heading style off from the toolbar.
+
+**The raw GitHub content this pulls from can lag a few minutes after a push**, especially
+if that exact URL was fetched (by a script, a browser, anything) shortly before the push
+landed — that request can seed a stale cache entry that then serves for its full TTL
+regardless of what's actually on `main`. If a refresh doesn't pick up a change that's
+definitely pushed, that's the likely cause; wait a few minutes and retry, or paste
+`dist/plugin-paste.js` by hand for an immediate check.

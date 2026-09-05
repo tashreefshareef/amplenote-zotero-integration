@@ -1151,3 +1151,11 @@ mock that drifts from reality makes green tests meaningless.
   is what registers it. The puzzle-piece icon on the note itself only appears afterward.
   Also: editing a live plugin's source note and reloading applies the change immediately
   (a "Plugin update installed" toast), no separate re-install step.
+- **2026-09-05** — `insertText` actions are reachable from the same `/` slash-command
+  picker as `appOption` (Zotero integration project), grouped under an "INSERT" heading,
+  distinct from `appOption`'s "DISPLAY AND GLOBAL ACTIONS" heading. Selecting one from
+  there runs it exactly like typing the `{Plugin Name}` macro (#11) — the `{...}` syntax
+  is not the only trigger. Also confirmed: `app.settings["..."]` for a given plugin is
+  genuinely scoped to that plugin — Account Settings → Plugins → [name] → Settings shows
+  only that plugin's own declared settings, never another installed plugin's, even when
+  two plugins are installed on the same account with differently-named settings rows.

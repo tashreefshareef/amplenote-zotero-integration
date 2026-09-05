@@ -15,7 +15,8 @@
  *     it during a multi-page sync is exactly the retrofit the roadmap warns against
  *     doing later ("how you get banned mid-demo").
  */
-import { ZOTERO_API_BASE, ZOTERO_API_VERSION } from "./constants.js";
+import { ZOTERO_API_BASE, ZOTERO_API_VERSION, DEFAULT_CITATION_STYLE } from "./constants.js";
+import { stripHtmlToText } from "./format-citation.js";
 
 export class ZoteroApiError extends Error {
   constructor(status, body) {
@@ -52,6 +53,7 @@ const defaultSleep = (seconds) => new Promise((resolve) => setTimeout(resolve, s
 
 export function createZoteroClient({
   apiKey,
+  userID,
   fetchImpl = typeof fetch === "function" ? fetch : undefined,
   sleepImpl = defaultSleep,
 } = {}) {
@@ -140,5 +142,42 @@ export function createZoteroClient({
     return res.data;
   }
 
-  return { request, paginate, keysCurrent };
+  // Cached per client instance so a search doesn't cost two round trips every time —
+  // resolved once, lazily, the first time something needs it.
+  let cachedUserID = userID ?? null;
+  async function resolveUserID() {
+    if (cachedUserID === null) {
+      const info = await keysCurrent();
+      cachedUserID = info.userID;
+    }
+    return cachedUserID;
+  }
+
+  /**
+   * Top-level items (excludes child notes/attachments — those aren't citable on their
+   * own) matching a quick-search query, with a formatted citation and bibliography
+   * entry already attached and stripped to plain text. `qmode: titleCreatorYear` is
+   * Zotero's default quick-search mode: title, creator and year only, not full text.
+   */
+  async function searchItems({ query, style = DEFAULT_CITATION_STYLE, limit = 25 } = {}) {
+    const uid = await resolveUserID();
+    const res = await request(`/users/${uid}/items/top`, {
+      params: {
+        q: query,
+        qmode: "titleCreatorYear",
+        itemType: "-attachment",
+        include: "data,citation,bib",
+        style,
+        limit,
+      },
+    });
+    return res.data.map((item) => ({
+      key: item.key,
+      title: item.data?.title || "(untitled)",
+      citation: stripHtmlToText(item.citation),
+      bib: stripHtmlToText(item.bib),
+    }));
+  }
+
+  return { request, paginate, keysCurrent, searchItems };
 }

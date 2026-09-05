@@ -170,3 +170,84 @@ describe("createZoteroClient#keysCurrent", () => {
     expect(fetchImpl.mock.calls[0][0].toString()).toBe("https://api.zotero.org/keys/current");
   });
 });
+
+describe("createZoteroClient#searchItems", () => {
+  function itemFixture(overrides = {}) {
+    return {
+      key: "ABCD1234",
+      data: { title: "Thinking, Fast and Slow" },
+      citation: "<span>Kahneman, <i>Thinking, Fast and Slow</i>.</span>",
+      bib: '<div class="csl-bib-body">Kahneman. Thinking, Fast and Slow. 2011.</div>',
+      ...overrides,
+    };
+  }
+
+  test("resolves the userID once via keysCurrent, then reuses it", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 16332327 } })) // keysCurrent
+      .mockResolvedValueOnce(fakeResponse({ body: [itemFixture()] })) // search 1
+      .mockResolvedValueOnce(fakeResponse({ body: [itemFixture()] })); // search 2
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    await client.searchItems({ query: "kahneman" });
+    await client.searchItems({ query: "kahneman again" });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(fetchImpl.mock.calls[0][0].toString()).toBe("https://api.zotero.org/keys/current");
+    expect(fetchImpl.mock.calls[1][0].toString()).toContain("/users/16332327/items/top");
+    expect(fetchImpl.mock.calls[2][0].toString()).toContain("/users/16332327/items/top");
+  });
+
+  test("skips resolving the userID when it's already known", async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(fakeResponse({ body: [itemFixture()] }));
+    const client = createZoteroClient({ apiKey: "k", userID: 16332327, fetchImpl });
+
+    await client.searchItems({ query: "kahneman" });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl.mock.calls[0][0].toString()).toContain("/users/16332327/items/top");
+  });
+
+  test("sends the query, quick-search mode, and citation/bib includes", async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(fakeResponse({ body: [itemFixture()] }));
+    const client = createZoteroClient({ apiKey: "k", userID: 1, fetchImpl });
+
+    await client.searchItems({ query: "kahneman" });
+
+    const url = new URL(fetchImpl.mock.calls[0][0].toString());
+    expect(url.pathname).toBe("/users/1/items/top");
+    expect(url.searchParams.get("q")).toBe("kahneman");
+    expect(url.searchParams.get("qmode")).toBe("titleCreatorYear");
+    expect(url.searchParams.get("itemType")).toBe("-attachment");
+    expect(url.searchParams.get("include")).toBe("data,citation,bib");
+    expect(url.searchParams.get("style")).toBe("chicago-note-bibliography");
+  });
+
+  test("returns results with citation/bib already stripped of HTML", async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(fakeResponse({ body: [itemFixture()] }));
+    const client = createZoteroClient({ apiKey: "k", userID: 1, fetchImpl });
+
+    const results = await client.searchItems({ query: "kahneman" });
+
+    expect(results).toEqual([
+      {
+        key: "ABCD1234",
+        title: "Thinking, Fast and Slow",
+        citation: "Kahneman, Thinking, Fast and Slow.",
+        bib: "Kahneman. Thinking, Fast and Slow. 2011.",
+      },
+    ]);
+  });
+
+  test("falls back to a placeholder title when an item has none", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValue(fakeResponse({ body: [itemFixture({ data: {} })] }));
+    const client = createZoteroClient({ apiKey: "k", userID: 1, fetchImpl });
+
+    const [result] = await client.searchItems({ query: "kahneman" });
+
+    expect(result.title).toBe("(untitled)");
+  });
+});

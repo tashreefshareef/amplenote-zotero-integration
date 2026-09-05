@@ -5,9 +5,10 @@ formatted citation insertion, content sync, and annotation import.
 
 Built for the [Amplenote plugin bounty](https://public.amplenote.com/u1ivsVxuqee3TntAwJ5Pvca8).
 
-> **Status: pre-implementation.** Nothing is built yet. The platform research is done and
-> all four Phase 0 spikes are closed, live — see `docs/zotero-findings.md`. Next is the
-> intent email, then Phase 1 (`docs/roadmap.md`).
+> **Status: Phase 1 underway.** Platform research done, all four Phase 0 spikes closed
+> live (`docs/zotero-findings.md`), intent email skipped. Foundation — build pipeline,
+> mock `app`, Zotero API client with pagination/backoff — is built and tested; not yet
+> verified against the live app. See `docs/roadmap.md`.
 
 ## Start here
 
@@ -18,6 +19,7 @@ Built for the [Amplenote plugin bounty](https://public.amplenote.com/u1ivsVxuqee
 | [`docs/bounty-note.md`](docs/bounty-note.md) | The bounty requirements, verbatim, including the footnote the rendered page drops |
 | [`docs/api-notes.md`](docs/api-notes.md) | Confirmed Amplenote API signatures and platform quirks. **Carried over and still living** — its "Lessons for the NEXT Amplenote plugin" section was written for this project |
 | [`docs/bugs-found.md`](docs/bugs-found.md) | General web-platform bugs and fixes. Also carried over, also still living |
+| [`docs/development.md`](docs/development.md) | Build, test, and how to set up the plugin note in Amplenote |
 
 ## The short version of the research
 
@@ -62,10 +64,11 @@ dependencies**. None of it runs unmodified; adapt it into place during Phase 1.
 
 ## Setup
 
-Once per clone, enable the repo's git hooks — `core.hooksPath` is local config, so it does
-not come with the checkout:
+See [`docs/development.md`](docs/development.md) for build, test and plugin-note setup.
+The short version:
 
 ```bash
+npm install && npm run build && npm test
 git config core.hooksPath .githooks
 ```
 

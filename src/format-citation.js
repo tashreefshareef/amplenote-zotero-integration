@@ -18,3 +18,14 @@ export function stripHtmlToText(html) {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+/**
+ * Amplenote's own `select` prompt input doesn't wrap or truncate a long option label —
+ * a full citation overflows the box and needs a scrollbar to read, reported live against
+ * a real search result. Truncate what's shown in the picker; the untruncated citation is
+ * still what actually gets inserted (this only touches the option label).
+ */
+export function truncateForLabel(text, maxLength = 80) {
+  if (!text || text.length <= maxLength) return text || "";
+  return `${text.slice(0, maxLength - 1).trimEnd()}…`;
+}

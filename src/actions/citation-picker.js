@@ -1,5 +1,6 @@
 import { SETTING_ZOTERO_API_KEY } from "../constants.js";
 import { createZoteroClient, ZoteroApiError, ZoteroRateLimitedError } from "../zotero-client.js";
+import { truncateForLabel } from "../format-citation.js";
 
 function errorMessage(e) {
   if (e instanceof ZoteroRateLimitedError) {
@@ -56,7 +57,9 @@ export async function pickCitation(app) {
       {
         label: "Reference",
         type: "select",
-        options: results.map((r) => ({ label: r.citation || r.title, value: r.key })),
+        // Full citation stays on the result object for insertion — only the label
+        // shown in the dropdown is shortened.
+        options: results.map((r) => ({ label: truncateForLabel(r.citation || r.title), value: r.key })),
       },
     ],
   });

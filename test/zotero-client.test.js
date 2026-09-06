@@ -405,3 +405,30 @@ describe("createZoteroClient#getItemExtras", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("createZoteroClient#getItem", () => {
+  test("fetches one item by key and returns its title", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(fakeResponse({ body: { key: "ITEM1", data: { title: "A Title" } } }));
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const item = await client.getItem("ITEM1");
+
+    expect(fetchImpl.mock.calls[1][0].toString()).toContain("/users/1/items/ITEM1");
+    expect(item).toEqual({ title: "A Title" });
+  });
+
+  test("falls back to a placeholder title when the item has none", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(fakeResponse({ body: { key: "ITEM1", data: {} } }));
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const item = await client.getItem("ITEM1");
+
+    expect(item.title).toBe("(untitled)");
+  });
+});

@@ -276,5 +276,18 @@ export function createZoteroClient({
     };
   }
 
-  return { request, paginate, keysCurrent, searchItems, syncItems, getItemExtras };
+  /**
+   * A single item's current title, by its Zotero key — used to recover a note this
+   * plugin lost track of (sync-library.js's `resolveNoteUUID`) when the sync state has
+   * no title on record for it (an item this plugin has never touched since title
+   * tracking was added). The Zotero key is always a reliable handle regardless of
+   * anything going wrong on the Amplenote note-lookup side.
+   */
+  async function getItem(itemKey) {
+    const uid = await resolveUserID();
+    const res = await request(`/users/${uid}/items/${itemKey}`, { params: { include: "data" } });
+    return { title: res.data?.data?.title || "(untitled)" };
+  }
+
+  return { request, paginate, keysCurrent, searchItems, syncItems, getItemExtras, getItem };
 }

@@ -163,7 +163,10 @@ describe("syncLibrary", () => {
     const app = createMockApp({
       settings: { "Zotero API key": "k" },
       notes: [
-        syncStateNote({ libraryVersion: 50, items: { OTHR1: { noteUUID: "item-note-2" } } }),
+        syncStateNote({
+          libraryVersion: 50,
+          items: { OTHR1: { noteUUID: "item-note-2", title: "Some Other Item" } },
+        }),
         {
           uuid: "item-note-2",
           name: "Some Other Item",
@@ -190,6 +193,42 @@ describe("syncLibrary", () => {
     expect(content).toContain("> A new highlight");
     expect(content).not.toContain("No highlights or notes yet");
     expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 0 new, 0 updated, 1 highlights refreshed.");
+  });
+
+  test("backfills a missing title from Zotero itself before attempting recovery", async () => {
+    const app = createMockApp({
+      settings: { "Zotero API key": "k" },
+      notes: [
+        // No title stored — predates title tracking.
+        syncStateNote({ libraryVersion: 50, items: { OTHR1: { noteUUID: "stale-uuid-3" } } }),
+        {
+          uuid: "real-uuid-3",
+          name: "Some Other Item",
+          content: "Old bib.\n\n## Highlights & Notes\n\n_No highlights or notes yet._\n",
+        },
+      ],
+    });
+    const attachment = { key: "ATT3", data: { itemType: "attachment", title: "Other.pdf" }, links: {} };
+    const annotation = {
+      key: "ANN3",
+      data: { itemType: "annotation", annotationType: "highlight", annotationText: "backfilled highlight", annotationSortIndex: "1" },
+    };
+    mockFetchSequence(
+      fakeResponse({ body: { userID: 1 } }), // keysCurrent
+      fakeResponse({ headers: { "Last-Modified-Version": "50" }, body: [] }), // items/top — nothing changed
+      fakeResponse({ body: { key: "OTHR1", data: { title: "Some Other Item" } } }), // getItem title backfill
+      fakeResponse({ body: [attachment] }), // children of OTHR1
+      fakeResponse({ body: [annotation] }) // children of the attachment
+    );
+
+    await syncLibrary(app);
+
+    expect(app._notes.get("real-uuid-3").content).toContain("backfilled highlight");
+    expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 0 new, 0 updated, 1 highlights refreshed.");
+
+    const syncNote = [...app._notes.values()].find((n) => n.name === "Zotero Sync");
+    expect(syncNote.content).toContain('"title": "Some Other Item"');
+    expect(syncNote.content).toContain('"noteUUID": "real-uuid-3"');
   });
 
   test("reports a per-item write failure when a stale noteUUID can't be recovered by name either", async () => {

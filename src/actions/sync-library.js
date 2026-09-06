@@ -141,6 +141,18 @@ export async function syncLibrary(app) {
   for (const [key, entry] of Object.entries(state.items)) {
     if (touchedKeys.has(key)) continue;
     try {
+      // Older entries predate title tracking. Backfill from Zotero itself (the item key
+      // is always a reliable handle) so resolveNoteUUID has a name to fall back on —
+      // note-uuid resolution has been observed to fail intermittently for a uuid that
+      // resolves fine moments before/after, so this fallback needs to actually work, not
+      // just exist for a one-time migration.
+      if (!entry.title) {
+        try {
+          entry.title = (await client.getItem(key)).title;
+        } catch {
+          // leave it unset; resolveNoteUUID just can't fall back to a name this time
+        }
+      }
       const uuid = await resolveNoteUUID(app, entry, entry.title);
       if (!uuid) {
         const named = entry.title ? `, and no note named "${entry.title}" was found to recover it` : "";

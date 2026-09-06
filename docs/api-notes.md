@@ -855,6 +855,33 @@ several of these cost real debugging time (or a live, reported bug) on this one.
     the common case (uuid drifted, name didn't) automatically instead of silently
     orphaning the mapping. See `src/actions/sync-library.js`'s `resolveNoteUUID`.
 
+    **CORRECTION (2026-09-06), same day — the "not durable" framing overstated what was
+    actually confirmed.** After shipping the `resolveNoteUUID` fallback above, a live
+    re-run against the same 4 originally-broken items succeeded with **zero** failures —
+    but the self-heal path never fired: the "Zotero Sync" note's stored `local-...` ids
+    came back byte-for-byte unchanged, meaning `app.findNote({ uuid: <the old local-
+    uuid> })` returned a real note this time. So the earlier failure was NOT "this uuid
+    stopped resolving, full stop" — `findNote` accepts the exact same old `local-...` id
+    that `getNoteContent` had returned null for shortly before. Two live facts that don't
+    fully reconcile, kept both rather than picking one to believe:
+    1. A note's OWN uuid, as shown in Amplenote's URL bar, is confirmed to differ from
+       the `local-...` id `createNote` returned for it (directly compared, unrelated
+       values).
+    2. That same original `local-...` id was later confirmed still valid input to
+       `findNote` (and, apparently, whatever `writeSection` did with it that same run).
+
+    Most likely explanation, unconfirmed: `local-...` is a **permanent alias** Amplenote
+    continues to resolve via `findNote`/note-lookup calls even after a different uuid
+    becomes the note's canonical, user-facing address — and the original
+    `getNoteContent` failure was a separate, likely transient condition (timing/backend
+    lag), not evidence the id itself had gone bad. **Don't treat "uuid is not durable" as
+    settled** — what's actually confirmed is narrower: a `getNoteContent` call on a
+    `createNote`-returned uuid failed once, silently (null, not a throw), for reasons
+    still not pinned down. The `resolveNoteUUID` fallback stays in place regardless — it
+    is cheap, correctly a no-op when the stored id still works (as it did here), and
+    would still recover the case this was originally built for if a genuine uuid-to-name
+    mismatch ever does occur.
+
 ## Core types
 
 **`noteHandle`** — an object, minimally `{ uuid: string }`. May also carry `name` and

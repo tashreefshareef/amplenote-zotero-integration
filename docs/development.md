@@ -243,9 +243,20 @@ Two fixes landed from this, in order:
    real-uuid pair, since the mock app doesn't reproduce the actual id-drift behavior on
    its own.
 
-Not yet re-verified live against the actual failure this was built to fix — the original
-4 items should now recover automatically on the next sync (found by name, since none
-were renamed), but that hasn't been re-run since the fix landed.
+**Re-verified live, 2026-09-06: the original 4 items now sync with zero failures** — but
+the result complicates the diagnosis rather than closing it cleanly. The self-heal path
+never triggered (the "Zotero Sync" note's stored `local-...` ids came back completely
+unchanged), meaning `app.findNote({ uuid })` accepted the exact same id that
+`getNoteContent` had returned null for a few minutes earlier. See `api-notes.md` finding
+18's same-day correction for the full account — short version: "the uuid is not
+durable" was too strong a claim; what's actually confirmed is narrower (one
+`getNoteContent` call failed once, for a reason not pinned down), and the
+`resolveNoteUUID` fallback stays as cheap insurance regardless, having correctly been a
+no-op here.
+
+Still untested: the actual annotation-content path (a highlight/note actually rendering
+correctly from a real annotated PDF) — every check so far has exercised the write
+mechanism, not confirmed real Zotero annotation data renders right.
 
 Folded into the same `Zotero: Sync now` action rather than a separate one, since it
 writes into the same per-item note. Each item note now also gets:

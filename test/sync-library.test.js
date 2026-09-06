@@ -94,7 +94,7 @@ describe("syncLibrary", () => {
     expect(syncNote.content).toContain('"ABCD1234"');
     expect(syncNote.content).toContain(itemNoteCall.uuid);
 
-    expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 1 new, 0 updated.");
+    expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 1 new, 0 updated, 0 highlights refreshed.");
   });
 
   test("a later sync updates the matched note in place instead of creating a duplicate", async () => {
@@ -120,7 +120,76 @@ describe("syncLibrary", () => {
     const itemsUrl = new URL(fetchImpl.mock.calls[1][0].toString());
     expect(itemsUrl.searchParams.get("since")).toBe("50");
 
-    expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 0 new, 1 updated.");
+    expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 0 new, 1 updated, 0 highlights refreshed.");
+  });
+
+  test("a new item note includes its attachment link and imported highlights", async () => {
+    const app = createMockApp({ settings: { "Zotero API key": "k" } });
+    const attachment = {
+      key: "ATT1",
+      data: { itemType: "attachment", title: "Kahneman.pdf" },
+      links: { alternate: { href: "https://www.zotero.org/tashreef/items/ATT1" } },
+    };
+    const annotation = {
+      key: "ANN1",
+      data: {
+        itemType: "annotation",
+        annotationType: "highlight",
+        annotationText: "System 1 and System 2",
+        annotationComment: "key idea",
+        annotationPageLabel: "12",
+        annotationSortIndex: "00001",
+      },
+    };
+    mockFetchSequence(
+      fakeResponse({ body: { userID: 1 } }), // keysCurrent
+      fakeResponse({ headers: { "Last-Modified-Version": "99" }, body: [KAHNEMAN] }), // items/top
+      fakeResponse({ body: [attachment] }), // children of the item
+      fakeResponse({ body: [annotation] }) // children of the attachment
+    );
+
+    await syncLibrary(app);
+
+    const itemNoteCall = app._calls.createdNotes.find((c) => c.name === "Thinking, Fast and Slow");
+    const content = app._notes.get(itemNoteCall.uuid).content;
+    expect(content).toContain('[View "Kahneman.pdf" in Zotero](https://www.zotero.org/tashreef/items/ATT1)');
+    expect(content).toContain("## Highlights & Notes");
+    expect(content).toContain("> System 1 and System 2 (p. 12)");
+    expect(content).toContain("key idea");
+    expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 1 new, 0 updated, 0 highlights refreshed.");
+  });
+
+  test("refreshes highlights for a previously-synced item this run's item sync didn't touch", async () => {
+    const app = createMockApp({
+      settings: { "Zotero API key": "k" },
+      notes: [
+        syncStateNote({ libraryVersion: 50, items: { OTHR1: { noteUUID: "item-note-2" } } }),
+        {
+          uuid: "item-note-2",
+          name: "Some Other Item",
+          content: "Old bib.\n\n## Highlights & Notes\n\n_No highlights or notes yet._\n",
+        },
+      ],
+    });
+    const attachment = { key: "ATT2", data: { itemType: "attachment", title: "Other.pdf" }, links: {} };
+    const annotation = {
+      key: "ANN2",
+      data: { itemType: "annotation", annotationType: "highlight", annotationText: "A new highlight", annotationSortIndex: "00001" },
+    };
+    mockFetchSequence(
+      fakeResponse({ body: { userID: 1 } }), // keysCurrent
+      fakeResponse({ headers: { "Last-Modified-Version": "50" }, body: [] }), // items/top — nothing changed
+      fakeResponse({ body: [attachment] }), // children of OTHR1
+      fakeResponse({ body: [annotation] }) // children of the attachment
+    );
+
+    await syncLibrary(app);
+
+    const content = app._notes.get("item-note-2").content;
+    expect(content).toContain("Old bib."); // untouched outside the section
+    expect(content).toContain("> A new highlight");
+    expect(content).not.toContain("No highlights or notes yet");
+    expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 0 new, 0 updated, 1 highlights refreshed.");
   });
 
   test("reports a per-item write failure instead of aborting the sync silently", async () => {

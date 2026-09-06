@@ -330,3 +330,78 @@ describe("createZoteroClient#syncItems", () => {
     expect(result).toMatchObject({ abstract: "", tags: [], url: null });
   });
 });
+
+describe("createZoteroClient#getItemExtras", () => {
+  const attachment = {
+    key: "ATT1",
+    data: { itemType: "attachment", title: "Kahneman.pdf" },
+    links: { alternate: { href: "https://www.zotero.org/tashreef/items/ATT1" } },
+  };
+
+  function annotationFixture(overrides = {}) {
+    return {
+      key: "ANN1",
+      data: {
+        itemType: "annotation",
+        annotationType: "highlight",
+        annotationText: "text",
+        annotationComment: "",
+        annotationPageLabel: "1",
+        annotationSortIndex: "00001",
+        ...overrides,
+      },
+    };
+  }
+
+  test("fetches the item's children, then each attachment's children, filtering to attachment/annotation types", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } })) // keysCurrent
+      .mockResolvedValueOnce(fakeResponse({ body: [attachment, { key: "N1", data: { itemType: "note" } }] })) // item's children
+      .mockResolvedValueOnce(fakeResponse({ body: [annotationFixture()] })); // attachment's children
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const extras = await client.getItemExtras("ITEM1");
+
+    expect(fetchImpl.mock.calls[1][0].toString()).toContain("/users/1/items/ITEM1/children");
+    expect(fetchImpl.mock.calls[2][0].toString()).toContain("/users/1/items/ATT1/children");
+    expect(extras.attachments).toEqual([
+      { key: "ATT1", title: "Kahneman.pdf", url: "https://www.zotero.org/tashreef/items/ATT1" },
+    ]);
+    expect(extras.annotations).toHaveLength(1);
+    expect(extras.annotations[0]).toMatchObject({ key: "ANN1", type: "highlight", text: "text" });
+  });
+
+  test("sorts annotations by Zotero's own sortIndex", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(fakeResponse({ body: [attachment] }))
+      .mockResolvedValueOnce(
+        fakeResponse({
+          body: [
+            annotationFixture({ annotationText: "second", annotationSortIndex: "00002" }),
+            annotationFixture({ annotationText: "first", annotationSortIndex: "00001" }),
+          ],
+        })
+      );
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const { annotations } = await client.getItemExtras("ITEM1");
+
+    expect(annotations.map((a) => a.text)).toEqual(["first", "second"]);
+  });
+
+  test("returns no annotations for an item with no attachments, without fetching further", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(fakeResponse({ body: [] }));
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const extras = await client.getItemExtras("ITEM1");
+
+    expect(extras).toEqual({ attachments: [], annotations: [] });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+});

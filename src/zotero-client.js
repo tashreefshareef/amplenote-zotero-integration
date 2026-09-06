@@ -224,5 +224,57 @@ export function createZoteroClient({
     };
   }
 
-  return { request, paginate, keysCurrent, searchItems, syncItems };
+  /** One item's direct children (attachments, standalone notes) — `include: "data"` is
+   * enough here; no citation/bib needed for a child item. */
+  async function getChildren(itemKey) {
+    const uid = await resolveUserID();
+    const { items } = await paginate(`/users/${uid}/items/${itemKey}/children`, {
+      params: { include: "data" },
+    });
+    return items;
+  }
+
+  /**
+   * Phase 4: an item's attachments and their annotations. Zotero nests annotations two
+   * levels below a top-level item (item -> attachment -> annotation), so this costs one
+   * children request for the item plus one per attachment found on it — acceptable for
+   * a manual "Sync now" trigger, not something to run unbounded in a loop.
+   *
+   * Annotation TEXT (highlights) and COMMENTS import; annotation `image`/`ink` content
+   * does not, for the same reason a PDF's own bytes don't (zotero-findings.md: no CORS
+   * on Zotero's file storage) — those are named but not rendered. Sorted by Zotero's own
+   * `annotationSortIndex` so imported highlights read in the PDF's own order.
+   */
+  async function getItemExtras(itemKey) {
+    const children = await getChildren(itemKey);
+    const attachments = children.filter((c) => c.data?.itemType === "attachment");
+
+    const annotations = [];
+    for (const attachment of attachments) {
+      const grandchildren = await getChildren(attachment.key);
+      for (const a of grandchildren) {
+        if (a.data?.itemType !== "annotation") continue;
+        annotations.push({
+          key: a.key,
+          type: a.data.annotationType || "",
+          text: a.data.annotationText || "",
+          comment: a.data.annotationComment || "",
+          pageLabel: a.data.annotationPageLabel || "",
+          sortIndex: a.data.annotationSortIndex || "",
+        });
+      }
+    }
+    annotations.sort((x, y) => x.sortIndex.localeCompare(y.sortIndex));
+
+    return {
+      attachments: attachments.map((a) => ({
+        key: a.key,
+        title: a.data?.title || "Attachment",
+        url: a.links?.alternate?.href || null,
+      })),
+      annotations,
+    };
+  }
+
+  return { request, paginate, keysCurrent, searchItems, syncItems, getItemExtras };
 }

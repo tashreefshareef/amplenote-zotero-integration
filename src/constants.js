@@ -15,3 +15,8 @@ export const DEFAULT_CITATION_STYLE = "chicago-note-bibliography";
 // its text, so sync-state.js counts occurrences before trusting a heading-addressed write.
 export const SYNC_NOTE_NAME = "Zotero Sync";
 export const SYNC_STATE_HEADING = "Zotero Sync State";
+
+// Phase 4: the per-item-note section holding imported Zotero annotations (highlights,
+// sticky notes). Present in every item note from creation so a later annotation-only
+// refresh (sync-library.js) always has a section to target.
+export const HIGHLIGHTS_HEADING = "Highlights & Notes";

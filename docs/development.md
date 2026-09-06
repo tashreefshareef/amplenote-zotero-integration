@@ -53,12 +53,15 @@ src/
   format-citation.js   Strips Zotero's citation/bib HTML to plain text
   sync-state.js        Reads/writes the Phase 3 sync watermark + key->noteUUID map,
                        persisted as JSON in a fenced code block (api-notes.md #4/#4b)
+  note-sections.js      Shared heading/section read+write helpers (writeSection),
+                       used by sync-state.js and by sync-library.js's Highlights section
   actions/
     test-connection.js   "Zotero: Test connection" — the Phase 1 smoke test
     citation-picker.js   Search Zotero, pick a result — shared by the insertText
                          and appOption citation actions (Phase 2)
     sync-library.js      "Zotero: Sync now" — items -> one note each, Zotero tags ->
-                         Amplenote tags, incremental via since= (Phase 3)
+                         Amplenote tags, incremental via since= (Phase 3), plus
+                         imported highlights/notes per item (Phase 4)
 esbuild.js            Build: src/ → dist/plugin.js
 dist/plugin.js        Build output (committed)
 test/
@@ -213,3 +216,38 @@ designed fallback, not a bug):
   per-item write loop had no `try/catch`, so any write failure for any reason would have
   aborted the whole sync silently. Fixed — failures are now isolated per item and
   reported in the final alert alongside the new/updated counts.
+
+## Phase 4: attachments and annotations — implemented, not yet live-checked
+
+Folded into the same `Zotero: Sync now` action rather than a separate one, since it
+writes into the same per-item note. Each item note now also gets:
+- A `[View "<filename>" in Zotero](...)` link per attachment, using that attachment's own
+  `links.alternate.href` — same pattern as Phase 3's item-level "View in Zotero" link, no
+  URL construction/guessing involved.
+- A `## Highlights & Notes` section: every annotation (highlight text + any comment, or a
+  sticky note's comment alone) under that item's attachments, in Zotero's own
+  `annotationSortIndex` reading order. `image`/`ink` annotations are named but their
+  content isn't rendered — same reason a PDF's own bytes can't be read
+  (`zotero-findings.md`, no CORS on Zotero's file storage) applies equally to an
+  annotation's extracted image.
+
+**The reason this needed more than "reuse Phase 3's per-item loop":** Zotero's item-level
+`since=` only reports a change to the TOP item's own metadata, not to a highlight added
+two levels down (item -> attachment -> annotation) with nothing else about the item
+touched — so an item genuinely unchanged since the last sync would never be revisited,
+and a highlight added to it would silently never show up. The fix here is a second pass,
+every run, over every OTHER already-known item (not touched by this run's item-level
+sync) that re-fetches and rewrites just its Highlights section. This is a real,
+deliberate cost — one extra Zotero request per previously-synced item, every manual
+sync, not just for what changed — accepted because it's a user-initiated action (not
+automatic/background) and because catching a highlight-only edit is the actual point of
+this phase.
+
+Unverified against the live app. Before trusting this phase, sync a library where at
+least one item has a PDF with highlights, and check:
+- The item's note shows the attachment link and the highlights, in the right order,
+  including a comment on a highlight if one exists.
+- Add or edit a highlight in Zotero on an item whose *bibliographic data you don't touch*,
+  then re-sync — the alert's "highlights refreshed" count should include that item, and
+  its note's Highlights section should show the change, with the rest of the note
+  untouched.

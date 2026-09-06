@@ -1,38 +1,9 @@
 import { SYNC_NOTE_NAME, SYNC_STATE_HEADING } from "./constants.js";
-
-function countHeadingOccurrences(content, headingText) {
-  return content
-    .split("\n")
-    .filter((l) => /^#{1,6}\s/.test(l) && l.replace(/^#{1,6}\s+/, "").trim() === headingText).length;
-}
-
-function extractSectionBody(content, headingText) {
-  const lines = content.split("\n");
-  const startIdx = lines.findIndex(
-    (l) => /^#{1,6}\s/.test(l) && l.replace(/^#{1,6}\s+/, "").trim() === headingText
-  );
-  if (startIdx === -1) return null;
-
-  let endIdx = lines.length;
-  for (let i = startIdx + 1; i < lines.length; i++) {
-    if (/^#{1,6}\s/.test(lines[i])) {
-      endIdx = i;
-      break;
-    }
-  }
-  return lines.slice(startIdx + 1, endIdx).join("\n");
-}
+import { countHeadingOccurrences, extractSectionBody, writeSection } from "./note-sections.js";
 
 function extractJsonFence(sectionBody) {
   const match = sectionBody.match(/```(?:json)?\n([\s\S]*?)\n```/);
   return match ? match[1] : null;
-}
-
-function duplicateHeadingError(occurrences) {
-  return new Error(
-    `The "${SYNC_NOTE_NAME}" note has ${occurrences} "${SYNC_STATE_HEADING}" sections — ` +
-      `delete the extra one before syncing again.`
-  );
 }
 
 function renderStateBody(state) {
@@ -57,7 +28,12 @@ export async function loadSyncState(app) {
 
   const content = await app.getNoteContent({ uuid: note.uuid });
   const occurrences = countHeadingOccurrences(content, SYNC_STATE_HEADING);
-  if (occurrences > 1) throw duplicateHeadingError(occurrences);
+  if (occurrences > 1) {
+    throw new Error(
+      `The "${SYNC_NOTE_NAME}" note has ${occurrences} "${SYNC_STATE_HEADING}" sections — ` +
+        `delete the extra one before syncing again.`
+    );
+  }
 
   const body = occurrences === 1 ? extractSectionBody(content, SYNC_STATE_HEADING) : null;
   const json = body ? extractJsonFence(body) : null;
@@ -89,16 +65,7 @@ export async function saveSyncState(app, state) {
     return;
   }
 
-  const content = await app.getNoteContent({ uuid: state.noteUUID });
-  const occurrences = countHeadingOccurrences(content, SYNC_STATE_HEADING);
-  if (occurrences > 1) throw duplicateHeadingError(occurrences);
-
-  if (occurrences === 0) {
-    await app.insertNoteContent({ uuid: state.noteUUID }, `\n# ${SYNC_STATE_HEADING}\n${body}`, { atEnd: true });
-    return;
-  }
-
-  await app.replaceNoteContent({ uuid: state.noteUUID }, body, {
-    section: { heading: { text: SYNC_STATE_HEADING } },
+  await writeSection(app, state.noteUUID, SYNC_STATE_HEADING, body, {
+    noteLabel: `The "${SYNC_NOTE_NAME}" note`,
   });
 }

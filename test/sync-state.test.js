@@ -60,6 +60,14 @@ describe("loadSyncState", () => {
 
     await expect(loadSyncState(app)).rejects.toThrow(/2 "Zotero Sync State" sections/);
   });
+
+  test("falls back to fresh state, rather than crashing, when the note is found but unreadable", async () => {
+    const app = { findNote: async () => ({ uuid: "note-1" }), getNoteContent: async () => null };
+
+    const state = await loadSyncState(app);
+
+    expect(state).toEqual({ noteUUID: "note-1", libraryVersion: null, items: {} });
+  });
 });
 
 describe("saveSyncState", () => {

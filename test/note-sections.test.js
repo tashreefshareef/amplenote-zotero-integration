@@ -46,6 +46,14 @@ describe("writeSection", () => {
     expect(content).toContain("kept");
   });
 
+  test("throws a clear error rather than crashing when the note's content can't be read", async () => {
+    const app = { getNoteContent: async () => null };
+
+    await expect(writeSection(app, "gone-uuid", "Target", "body", { noteLabel: "That note" })).rejects.toThrow(
+      /That note \(uuid gone-uuid\) could not be read/
+    );
+  });
+
   test("throws rather than guessing when the heading appears more than once", async () => {
     const app = createMockApp({
       notes: [{ uuid: "n1", content: "## Target\n\na\n\n## Target\n\nb\n" }],

@@ -27,6 +27,9 @@ export async function loadSyncState(app) {
   if (!note) return { noteUUID: null, libraryVersion: null, items: {} };
 
   const content = await app.getNoteContent({ uuid: note.uuid });
+  if (content === null || content === undefined) {
+    return { noteUUID: note.uuid, libraryVersion: null, items: {} };
+  }
   const occurrences = countHeadingOccurrences(content, SYNC_STATE_HEADING);
   if (occurrences > 1) {
     throw new Error(

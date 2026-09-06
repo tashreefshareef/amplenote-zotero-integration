@@ -39,6 +39,9 @@ export function extractSectionBody(content, headingText) {
  */
 export async function writeSection(app, noteUUID, headingText, body, { headingLevel = "#", noteLabel = noteUUID } = {}) {
   const content = await app.getNoteContent({ uuid: noteUUID });
+  if (content === null || content === undefined) {
+    throw new Error(`${noteLabel} (uuid ${noteUUID}) could not be read — it may no longer exist.`);
+  }
   const occurrences = countHeadingOccurrences(content, headingText);
   if (occurrences > 1) {
     throw new Error(`${noteLabel} has ${occurrences} "${headingText}" sections — delete the extra one before syncing again.`);

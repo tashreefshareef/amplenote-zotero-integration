@@ -251,3 +251,82 @@ describe("createZoteroClient#searchItems", () => {
     expect(result.title).toBe("(untitled)");
   });
 });
+
+describe("createZoteroClient#syncItems", () => {
+  function itemFixture(overrides = {}) {
+    return {
+      key: "ABCD1234",
+      version: 10,
+      data: { title: "Thinking, Fast and Slow", abstractNote: "A summary.", tags: [{ tag: "psychology" }] },
+      citation: "<span>Kahneman, Thinking, Fast and Slow.</span>",
+      bib: "<div>Kahneman. 2011.</div>",
+      links: { alternate: { href: "https://www.zotero.org/tashreef/items/ABCD1234" } },
+      ...overrides,
+    };
+  }
+
+  test("omits since= on a first, full sync", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(fakeResponse({ body: [] }));
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    await client.syncItems({});
+
+    const url = new URL(fetchImpl.mock.calls[1][0].toString());
+    expect(url.searchParams.has("since")).toBe(false);
+    expect(url.searchParams.get("itemType")).toBe("-attachment");
+  });
+
+  test("passes sinceVersion through for an incremental sync", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(fakeResponse({ body: [] }));
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    await client.syncItems({ sinceVersion: 50 });
+
+    const url = new URL(fetchImpl.mock.calls[1][0].toString());
+    expect(url.searchParams.get("since")).toBe("50");
+  });
+
+  test("maps items to the fields sync needs, with tags flattened and HTML stripped", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(fakeResponse({ headers: { "Last-Modified-Version": "99" }, body: [itemFixture()] }));
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const result = await client.syncItems({});
+
+    expect(result.lastModifiedVersion).toBe(99);
+    expect(result.items).toEqual([
+      {
+        key: "ABCD1234",
+        version: 10,
+        title: "Thinking, Fast and Slow",
+        abstract: "A summary.",
+        tags: ["psychology"],
+        citation: "Kahneman, Thinking, Fast and Slow.",
+        bib: "Kahneman. 2011.",
+        url: "https://www.zotero.org/tashreef/items/ABCD1234",
+      },
+    ]);
+  });
+
+  test("defaults abstract/tags/url when the item carries none", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(
+        fakeResponse({ body: [itemFixture({ data: { title: "Bare Item" }, links: {} })] })
+      );
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const [result] = (await client.syncItems({})).items;
+
+    expect(result).toMatchObject({ abstract: "", tags: [], url: null });
+  });
+});

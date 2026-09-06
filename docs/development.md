@@ -49,12 +49,16 @@ src/
   plugin.js          The plugin object — kept thin, delegates to actions/
   constants.js        Zotero API base/version, settings-row labels, default citation style
   zotero-client.js     Zotero Web API v3 client: auth header, since= pagination,
-                       Backoff/Retry-After, searchItems()
+                       Backoff/Retry-After, searchItems(), syncItems()
   format-citation.js   Strips Zotero's citation/bib HTML to plain text
+  sync-state.js        Reads/writes the Phase 3 sync watermark + key->noteUUID map,
+                       persisted as JSON in a fenced code block (api-notes.md #4/#4b)
   actions/
     test-connection.js   "Zotero: Test connection" — the Phase 1 smoke test
     citation-picker.js   Search Zotero, pick a result — shared by the insertText
                          and appOption citation actions (Phase 2)
+    sync-library.js      "Zotero: Sync now" — items -> one note each, Zotero tags ->
+                         Amplenote tags, incremental via since= (Phase 3)
 esbuild.js            Build: src/ → dist/plugin.js
 dist/plugin.js        Build output (committed)
 test/
@@ -169,3 +173,27 @@ landed — that request can seed a stale cache entry that then serves for its fu
 regardless of what's actually on `main`. If a refresh doesn't pick up a change that's
 definitely pushed, that's the likely cause; wait a few minutes and retry, or paste
 `dist/plugin-paste.js` by hand for an immediate check.
+
+## Phase 3: content sync — implemented, not yet live-checked
+
+`Zotero: Sync now` (an `appOption`) pulls the library via `since=` incremental sync,
+writes one Amplenote note per Zotero item (title, formatted bibliography, abstract if
+present, a link back to the item's Zotero web-library page), applies the item's Zotero
+tags as the note's tags at creation time, and persists a key -> noteUUID map plus the
+library-version watermark as JSON in a fenced code block inside a note named "Zotero
+Sync" (`src/sync-state.js`).
+
+Known, deliberate trims (roadmap.md's "trimmed build"):
+- **Deletions aren't synced.** Zotero exposes deletions via a separate endpoint; a note
+  whose Zotero item was deleted just stops being touched by future syncs.
+- **Tags don't refresh on a re-sync.** There is no confirmed Amplenote API to retag an
+  existing note — only `createNote`'s tags argument, at creation time.
+
+This is unverified against the live app — CLAUDE.md's rule applies: a passing Jest run
+against the mock `app` is not evidence Amplenote's sandbox behaves the same way. Before
+trusting this phase, run **Zotero: Sync now** for real and check:
+- A "Zotero Sync" note is created with a `# Zotero Sync State` heading and a valid JSON
+  fence.
+- Each library item gets its own note, correctly tagged.
+- Running sync again updates those notes in place rather than duplicating them, and the
+  `since=` value sent on the second run matches the first run's `Last-Modified-Version`.

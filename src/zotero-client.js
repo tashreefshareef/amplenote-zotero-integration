@@ -36,6 +36,15 @@ export class ZoteroRateLimitedError extends Error {
   }
 }
 
+/** Shared by every action that surfaces a Zotero call failure via app.alert. */
+export function describeZoteroError(e) {
+  if (e instanceof ZoteroRateLimitedError) {
+    return `Zotero rate-limited this request — retry in ${e.retryAfterSeconds}s.`;
+  }
+  if (e instanceof ZoteroApiError) return `Zotero API error (HTTP ${e.status}). Check the key is current.`;
+  return `Could not reach Zotero: ${e.message}`;
+}
+
 const numberOrNull = (value) => (value === null || value === "" ? null : Number(value));
 
 /** Zotero's `Link` header: comma-separated `<url>; rel="name"` entries. */
@@ -179,5 +188,41 @@ export function createZoteroClient({
     }));
   }
 
-  return { request, paginate, keysCurrent, searchItems };
+  /**
+   * Phase 3 content sync. `sinceVersion` omitted means a full pull (first-ever sync);
+   * passed, Zotero returns only items changed after that library version. Same item
+   * shape as `searchItems` plus the fields sync needs beyond a citation: `version` (this
+   * item's own watermark, unused today but cheap to carry), `tags` (applied to the
+   * Amplenote note at creation only — see sync-library.js, there's no confirmed API to
+   * retag an existing note), `abstract`, and `url` (the item's own web-library permalink,
+   * `links.alternate.href`, already on the envelope with no extra round trip).
+   *
+   * Deletions are a separate Zotero endpoint (`/items/trash` or a `deleted?since=` feed)
+   * and are NOT handled here — the roadmap's trimmed scope keeps the incremental pull but
+   * drops the deletion tail. A note whose Zotero item was deleted just stops being
+   * touched by future syncs.
+   */
+  async function syncItems({ sinceVersion, pageSize = 50 } = {}) {
+    const uid = await resolveUserID();
+    const { items, lastModifiedVersion } = await paginate(`/users/${uid}/items/top`, {
+      params: { itemType: "-attachment", include: "data,citation,bib" },
+      sinceVersion,
+      pageSize,
+    });
+    return {
+      lastModifiedVersion,
+      items: items.map((item) => ({
+        key: item.key,
+        version: item.version,
+        title: item.data?.title || "(untitled)",
+        abstract: item.data?.abstractNote || "",
+        tags: (item.data?.tags || []).map((t) => t.tag),
+        citation: stripHtmlToText(item.citation),
+        bib: stripHtmlToText(item.bib),
+        url: item.links?.alternate?.href || null,
+      })),
+    };
+  }
+
+  return { request, paginate, keysCurrent, searchItems, syncItems };
 }

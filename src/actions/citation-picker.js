@@ -1,14 +1,6 @@
 import { SETTING_ZOTERO_API_KEY } from "../constants.js";
-import { createZoteroClient, ZoteroApiError, ZoteroRateLimitedError } from "../zotero-client.js";
+import { createZoteroClient, describeZoteroError } from "../zotero-client.js";
 import { truncateForLabel } from "../format-citation.js";
-
-function errorMessage(e) {
-  if (e instanceof ZoteroRateLimitedError) {
-    return `Zotero rate-limited this request — retry in ${e.retryAfterSeconds}s.`;
-  }
-  if (e instanceof ZoteroApiError) return `Zotero API error (HTTP ${e.status}). Check the key is current.`;
-  return `Could not reach Zotero: ${e.message}`;
-}
 
 // zotero-findings.md confirmed a `string` and a `select` input coexisting in ONE
 // app.prompt returns a positional array. It did not test a prompt with a SINGLE input —
@@ -44,7 +36,7 @@ export async function pickCitation(app) {
   try {
     results = await client.searchItems({ query });
   } catch (e) {
-    await app.alert(errorMessage(e));
+    await app.alert(describeZoteroError(e));
     return null;
   }
   if (!results.length) {

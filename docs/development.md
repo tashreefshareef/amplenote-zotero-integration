@@ -204,10 +204,11 @@ designed fallback, not a bug):
   actually changed).
 - Editing one item in Zotero (adding a tag) and re-syncing correctly reported `0 new,
   1 updated`, matched the item by its stored key, and rewrote the existing note in place
-  — **no duplicate created**. `app.createNote`'s returned uuid came back prefixed
-  `local-...` (not documented in `api-notes.md`, presumably a client-side ID pending
-  backend sync) and it stayed valid for a later `replaceNoteContent` write, at least
-  across the several-minute gap tested here.
+  — no duplicate created. `app.createNote`'s returned uuid came back prefixed
+  `local-...` and stayed valid for that particular write. **It did NOT stay valid
+  indefinitely** — see Phase 4 below and `api-notes.md` finding 18. Given the actual
+  scope of that finding, this Phase 3 result is best read as "worked within the window
+  tested," not as evidence the id is durable.
 - **A run that appeared to silently do nothing** (no alert, no error) turned out to be a
   stale browser tab/session, not a plugin bug — confirmed by the identical action
   succeeding immediately in a different browser, and by `Zotero: Test connection`
@@ -217,7 +218,34 @@ designed fallback, not a bug):
   aborted the whole sync silently. Fixed — failures are now isolated per item and
   reported in the final alert alongside the new/updated counts.
 
-## Phase 4: attachments and annotations — implemented, not yet live-checked
+## Phase 4: attachments and annotations — in progress, one live bug found and fixed
+
+**A live run of the highlights-refresh pass failed on all 4 previously-synced items**,
+each with `Cannot read properties of null (reading 'split')`. Root cause chased to
+ground: `app.createNote`'s returned uuid is not durable (`api-notes.md` finding 18, now
+the canonical writeup) — it came back prefixed `local-...`, and by the time of this run
+those ids no longer resolved to the real notes at all, confirmed by comparing one item's
+stored `local-...` id against that same note's real uuid read straight out of Amplenote's
+own URL bar (`https://www.amplenote.com/notes/<uuid>`) — completely different values, no
+resemblance. The notes themselves were fine the whole time; only the plugin's remembered
+identifier had gone stale.
+
+Two fixes landed from this, in order:
+1. `note-sections.js`'s `writeSection` and `sync-state.js`'s `loadSyncState` both fed
+   `app.getNoteContent`'s result straight into `.split()` with no null check — turned a
+   real failure into a useless raw `TypeError`. Both now treat a null/undefined read as
+   "this note is unreadable" and report or recover accordingly.
+2. The actual fix: `sync-library.js`'s `resolveNoteUUID` now confirms a stored uuid still
+   resolves (`app.findNote({ uuid })`) before writing to it, and falls back to
+   `app.findNote({ name })` to re-locate and self-heal the stored mapping if it doesn't —
+   in both the main per-item loop and the highlights-refresh pass. Covered by tests
+   (`test/sync-library.test.js`'s two "self-heals" tests) using a fake stale-uuid/
+   real-uuid pair, since the mock app doesn't reproduce the actual id-drift behavior on
+   its own.
+
+Not yet re-verified live against the actual failure this was built to fix — the original
+4 items should now recover automatically on the next sync (found by name, since none
+were renamed), but that hasn't been re-run since the fix landed.
 
 Folded into the same `Zotero: Sync now` action rather than a separate one, since it
 writes into the same per-item note. Each item note now also gets:

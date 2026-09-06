@@ -192,11 +192,11 @@ describe("syncLibrary", () => {
     expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 0 new, 0 updated, 1 highlights refreshed.");
   });
 
-  test("reports a per-item write failure instead of aborting the sync silently", async () => {
+  test("reports a per-item write failure when a stale noteUUID can't be recovered by name either", async () => {
     const app = createMockApp({
       settings: { "Zotero API key": "k" },
-      // "missing-note" is not seeded, so replaceNoteContent throws for this item —
-      // models a stored noteUUID that no longer resolves to a real note.
+      // "missing-note" resolves to nothing, and no note is named "Thinking, Fast and
+      // Slow" either — models a stored noteUUID that's gone stale with no way back.
       notes: [syncStateNote({ libraryVersion: 50, items: { ABCD1234: { noteUUID: "missing-note" } } })],
     });
     mockFetchSequence(
@@ -209,7 +209,70 @@ describe("syncLibrary", () => {
     const alert = app._calls.alerts.at(-1);
     expect(alert).toMatch(/0 new, 0 updated/);
     expect(alert).toMatch(/1 failed/);
-    expect(alert).toMatch(/unknown note/);
+    expect(alert).toMatch(/no longer exists/);
+  });
+
+  test("self-heals a stale stored noteUUID by re-finding the note by name", async () => {
+    const app = createMockApp({
+      settings: { "Zotero API key": "k" },
+      notes: [
+        syncStateNote({
+          libraryVersion: 50,
+          items: { ABCD1234: { noteUUID: "stale-uuid", title: "Thinking, Fast and Slow" } },
+        }),
+        // createNote's uuid isn't durable (confirmed live, 2026-09-06) — this is the
+        // note's real, current uuid, unrelated to the stale one stored above.
+        { uuid: "real-uuid", name: "Thinking, Fast and Slow", content: "old content\n" },
+      ],
+    });
+    mockFetchSequence(
+      fakeResponse({ body: { userID: 1 } }),
+      fakeResponse({ headers: { "Last-Modified-Version": "101" }, body: [KAHNEMAN] })
+    );
+
+    await syncLibrary(app);
+
+    expect(app._calls.createdNotes).toHaveLength(0); // recovered, not recreated (sync-state note already existed too)
+    expect(app._notes.get("real-uuid").content).toContain("Kahneman. 2011.");
+
+    const syncNote = [...app._notes.values()].find((n) => n.name === "Zotero Sync");
+    expect(syncNote.content).toContain('"noteUUID": "real-uuid"');
+    expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 0 new, 1 updated, 0 highlights refreshed.");
+  });
+
+  test("self-heals during a highlights-only refresh too, using the item's persisted title", async () => {
+    const app = createMockApp({
+      settings: { "Zotero API key": "k" },
+      notes: [
+        syncStateNote({
+          libraryVersion: 50,
+          items: { OTHR1: { noteUUID: "stale-uuid-2", title: "Some Other Item" } },
+        }),
+        {
+          uuid: "real-uuid-2",
+          name: "Some Other Item",
+          content: "Old bib.\n\n## Highlights & Notes\n\n_No highlights or notes yet._\n",
+        },
+      ],
+    });
+    const attachment = { key: "ATT2", data: { itemType: "attachment", title: "Other.pdf" }, links: {} };
+    const annotation = {
+      key: "ANN2",
+      data: { itemType: "annotation", annotationType: "highlight", annotationText: "recovered highlight", annotationSortIndex: "1" },
+    };
+    mockFetchSequence(
+      fakeResponse({ body: { userID: 1 } }), // keysCurrent
+      fakeResponse({ headers: { "Last-Modified-Version": "50" }, body: [] }), // items/top — nothing changed
+      fakeResponse({ body: [attachment] }), // children of OTHR1
+      fakeResponse({ body: [annotation] }) // children of the attachment
+    );
+
+    await syncLibrary(app);
+
+    const content = app._notes.get("real-uuid-2").content;
+    expect(content).toContain("Old bib.");
+    expect(content).toContain("recovered highlight");
+    expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 0 new, 0 updated, 1 highlights refreshed.");
   });
 
   test("alerts a clear message and leaves state untouched when the Zotero call fails", async () => {

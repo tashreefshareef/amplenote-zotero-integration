@@ -821,6 +821,40 @@ several of these cost real debugging time (or a live, reported bug) on this one.
     unchanged and diff it — if the platform cannot reproduce its own output, nothing built
     on that write is safe, and the failure is silent.
 
+18. **`app.createNote`'s returned uuid is not durable — a plugin that persists it and
+    trusts it indefinitely will eventually fail silently-ish (a null/undefined read, not
+    a thrown "not found").** Confirmed live, 2026-09-06 (Zotero integration project): a
+    plugin created 4 notes via `app.createNote`, and the uuid returned by each call was
+    prefixed `local-...` (e.g. `local-fbb5560a-1e7e-4dd6-b6d5-56da4fd3e65d`) — stored as
+    the plugin's own record of "this Zotero item's note". Sometime later (tens of
+    minutes, not verified more precisely), that same note's REAL uuid, read directly out
+    of Amplenote's own URL bar (`https://www.amplenote.com/notes/<uuid>`), was a
+    completely different, unrelated-looking value with no `local-` prefix and no
+    resemblance to the one `createNote` had returned. The note itself was untouched and
+    still visible in the note list the whole time — only the identifier changed underneath
+    it. `app.getNoteContent({ uuid: <the old local- uuid> })` on the stale id returned
+    `null`/`undefined` rather than throwing, and `app.replaceNoteContent`/
+    `insertNoteContent` against it are UNTESTED for what they do (not deliberately
+    triggered) — assume they fail the same quiet way rather than throwing something
+    catchable and specific.
+
+    **Working theory, not confirmed by Amplenote:** `local-...` looks like a client-side
+    ID assigned at creation, before the note has round-tripped through Amplenote's own
+    backend sync — swapped for a permanent server-assigned uuid once that sync completes
+    in the background, on a timeline the plugin has no visibility into and cannot wait
+    out deterministically.
+
+    **Consequence for any plugin that keeps its own note -> uuid mapping** (this project's
+    Phase 3/4 sync bookkeeping is exactly this shape): storing the `createNote` return
+    value once and reusing it forever is not safe. Before writing to a remembered uuid,
+    confirm it still resolves (`app.findNote({ uuid })` returns non-null — cheap, and
+    exactly what that method is documented to do), and if not, fall back to
+    `app.findNote({ name })` to re-locate the note and heal the stored mapping. This
+    doesn't fully solve it — a note that's also been renamed since creation is
+    unrecoverable by name either, and there's no third way to find it — but it recovers
+    the common case (uuid drifted, name didn't) automatically instead of silently
+    orphaning the mapping. See `src/actions/sync-library.js`'s `resolveNoteUUID`.
+
 ## Core types
 
 **`noteHandle`** — an object, minimally `{ uuid: string }`. May also carry `name` and
@@ -837,7 +871,7 @@ string. `app.context.noteUUID` is a bare string, so wrap it: `{ uuid: app.contex
 | `app.getNoteContent` | `(noteHandle)` | note content as markdown `String` | ✅ |
 | `app.insertNoteContent` | `(noteHandle, content, { atEnd })` | **nothing** | ✅ Throws over 100k chars or if the note is readonly. |
 | `app.replaceNoteContent` | `(noteHandle, content, { section })` | `boolean` | ✅ See "section" below — important. |
-| `app.createNote` | `(name?, tags?, { archive }?)` | `uuid` of the new note | ✅ |
+| `app.createNote` | `(name?, tags?, { archive }?)` | `uuid` of the new note | ⚠️ Not durable — see finding 18. |
 | `app.findNote` | `(noteHandle)` — `{uuid}` or `{name, tags?}` | `noteHandle` with metadata, or `null` | ✅ |
 | `app.prompt` | `(message, { inputs, actions })` | entered value(s), **`null` if cancelled**, or action result | ✅ Cancel is `null`, not `undefined`. |
 | `app.alert` | `(message, { actions, preface, primaryAction, scrollToEnd })` | `null` if dismissed, `-1` for primary action, else action index/value | ✅ |

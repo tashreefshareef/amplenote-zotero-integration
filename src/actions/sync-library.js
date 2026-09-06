@@ -37,6 +37,25 @@ async function getExtrasOrEmpty(client, key) {
 }
 
 /**
+ * Confirmed live, 2026-09-06: `app.createNote`'s returned uuid is not durable. It comes
+ * back prefixed `local-...` and gets swapped for a different, permanent uuid once the
+ * note finishes syncing to Amplenote's backend — so a uuid saved straight from
+ * `createNote` and trusted forever silently stops resolving. Before writing to a stored
+ * uuid, confirm it still exists; if not, re-find the note by its name and heal the
+ * stored mapping (mutates `entry` in place) so future syncs use the corrected uuid.
+ * Returns null if the note is genuinely gone (or was renamed AND its uuid drifted,
+ * which this can't recover from — the caller reports that as a failure).
+ */
+async function resolveNoteUUID(app, entry, title) {
+  if (await app.findNote({ uuid: entry.noteUUID })) return entry.noteUUID;
+  if (!title) return null;
+  const byName = await app.findNote({ name: title });
+  if (!byName) return null;
+  entry.noteUUID = byName.uuid;
+  return byName.uuid;
+}
+
+/**
  * "Zotero: Sync now" (Phase 3 content sync + Phase 4 annotation import, roadmap.md).
  * Manual trigger rather than automatic/background — Amplenote plugins have no
  * background execution to run this on.
@@ -100,12 +119,17 @@ export async function syncLibrary(app) {
       const content = renderItemNote(item, extras);
 
       if (existing) {
-        await app.replaceNoteContent({ uuid: existing.noteUUID }, content);
+        const uuid = await resolveNoteUUID(app, existing, item.title);
+        if (!uuid) {
+          throw new Error(`note ${existing.noteUUID} no longer exists, and no note named "${item.title}" was found to recover it`);
+        }
+        await app.replaceNoteContent({ uuid }, content);
+        existing.title = item.title;
         updated++;
       } else {
         const uuid = await app.createNote(item.title, item.tags);
         await app.insertNoteContent({ uuid }, content, { atEnd: true });
-        state.items[item.key] = { noteUUID: uuid };
+        state.items[item.key] = { noteUUID: uuid, title: item.title };
         created++;
       }
     } catch (e) {
@@ -114,11 +138,16 @@ export async function syncLibrary(app) {
   }
 
   let highlightsRefreshed = 0;
-  for (const [key, { noteUUID }] of Object.entries(state.items)) {
+  for (const [key, entry] of Object.entries(state.items)) {
     if (touchedKeys.has(key)) continue;
     try {
+      const uuid = await resolveNoteUUID(app, entry, entry.title);
+      if (!uuid) {
+        const named = entry.title ? `, and no note named "${entry.title}" was found to recover it` : "";
+        throw new Error(`note ${entry.noteUUID} no longer exists${named}`);
+      }
       const extras = await client.getItemExtras(key);
-      await writeSection(app, noteUUID, HIGHLIGHTS_HEADING, renderAnnotations(extras.annotations), {
+      await writeSection(app, uuid, HIGHLIGHTS_HEADING, renderAnnotations(extras.annotations), {
         headingLevel: "##",
         noteLabel: `The note for Zotero item ${key}`,
       });

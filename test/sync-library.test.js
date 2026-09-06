@@ -123,6 +123,26 @@ describe("syncLibrary", () => {
     expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 0 new, 1 updated.");
   });
 
+  test("reports a per-item write failure instead of aborting the sync silently", async () => {
+    const app = createMockApp({
+      settings: { "Zotero API key": "k" },
+      // "missing-note" is not seeded, so replaceNoteContent throws for this item —
+      // models a stored noteUUID that no longer resolves to a real note.
+      notes: [syncStateNote({ libraryVersion: 50, items: { ABCD1234: { noteUUID: "missing-note" } } })],
+    });
+    mockFetchSequence(
+      fakeResponse({ body: { userID: 1 } }),
+      fakeResponse({ headers: { "Last-Modified-Version": "101" }, body: [KAHNEMAN] })
+    );
+
+    await syncLibrary(app);
+
+    const alert = app._calls.alerts.at(-1);
+    expect(alert).toMatch(/0 new, 0 updated/);
+    expect(alert).toMatch(/1 failed/);
+    expect(alert).toMatch(/unknown note/);
+  });
+
   test("alerts a clear message and leaves state untouched when the Zotero call fails", async () => {
     const app = createMockApp({
       settings: { "Zotero API key": "k" },

@@ -46,18 +46,26 @@ export async function syncLibrary(app) {
 
   let created = 0;
   let updated = 0;
+  const failures = [];
   for (const item of result.items) {
     const content = renderItemNote(item);
     const existing = state.items[item.key];
 
-    if (existing) {
-      await app.replaceNoteContent({ uuid: existing.noteUUID }, content);
-      updated++;
-    } else {
-      const uuid = await app.createNote(item.title, item.tags);
-      await app.insertNoteContent({ uuid }, content, { atEnd: true });
-      state.items[item.key] = { noteUUID: uuid };
-      created++;
+    // Isolated per item: one bad write (e.g. a stored noteUUID that no longer resolves)
+    // must not silently abort the rest of the sync, the way every other failure path in
+    // this action alerts a clear message instead of throwing uncaught.
+    try {
+      if (existing) {
+        await app.replaceNoteContent({ uuid: existing.noteUUID }, content);
+        updated++;
+      } else {
+        const uuid = await app.createNote(item.title, item.tags);
+        await app.insertNoteContent({ uuid }, content, { atEnd: true });
+        state.items[item.key] = { noteUUID: uuid };
+        created++;
+      }
+    } catch (e) {
+      failures.push(`${item.title} (${e.message})`);
     }
   }
 
@@ -70,5 +78,6 @@ export async function syncLibrary(app) {
     return;
   }
 
-  await app.alert(`Zotero sync complete: ${created} new, ${updated} updated.`);
+  const summary = `Zotero sync complete: ${created} new, ${updated} updated.`;
+  await app.alert(failures.length ? `${summary} ${failures.length} failed: ${failures.join("; ")}` : summary);
 }

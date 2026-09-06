@@ -174,7 +174,7 @@ regardless of what's actually on `main`. If a refresh doesn't pick up a change t
 definitely pushed, that's the likely cause; wait a few minutes and retry, or paste
 `dist/plugin-paste.js` by hand for an immediate check.
 
-## Phase 3: content sync — implemented, not yet live-checked
+## Phase 3: content sync — live-verified, 2026-09-06
 
 `Zotero: Sync now` (an `appOption`) pulls the library via `since=` incremental sync,
 writes one Amplenote note per Zotero item (title, formatted bibliography, abstract if
@@ -189,11 +189,27 @@ Known, deliberate trims (roadmap.md's "trimmed build"):
 - **Tags don't refresh on a re-sync.** There is no confirmed Amplenote API to retag an
   existing note — only `createNote`'s tags argument, at creation time.
 
-This is unverified against the live app — CLAUDE.md's rule applies: a passing Jest run
-against the mock `app` is not evidence Amplenote's sandbox behaves the same way. Before
-trusting this phase, run **Zotero: Sync now** for real and check:
-- A "Zotero Sync" note is created with a `# Zotero Sync State` heading and a valid JSON
-  fence.
-- Each library item gets its own note, correctly tagged.
-- Running sync again updates those notes in place rather than duplicating them, and the
-  `since=` value sent on the second run matches the first run's `Last-Modified-Version`.
+**Confirmed live, 2026-09-06**, against a real library of 4 items (one a blank test
+"Journal Article" with no fields set — correctly rendered as `(untitled)` / `N.d.`, the
+designed fallback, not a bug):
+- First sync created one note per item, each correctly titled, tagged, and content
+  (bibliography, abstract, "View in Zotero" link) — matched the "Zotero Sync" note's
+  recorded `libraryVersion` and per-item `noteUUID` map exactly.
+- A second sync with nothing changed on the Zotero side correctly returned `0 new,
+  0 updated` — `since=` suppressing unchanged items, not a bug (the earlier plan on this
+  page to expect "0 new, N updated" here was wrong; `since=` only returns items that
+  actually changed).
+- Editing one item in Zotero (adding a tag) and re-syncing correctly reported `0 new,
+  1 updated`, matched the item by its stored key, and rewrote the existing note in place
+  — **no duplicate created**. `app.createNote`'s returned uuid came back prefixed
+  `local-...` (not documented in `api-notes.md`, presumably a client-side ID pending
+  backend sync) and it stayed valid for a later `replaceNoteContent` write, at least
+  across the several-minute gap tested here.
+- **A run that appeared to silently do nothing** (no alert, no error) turned out to be a
+  stale browser tab/session, not a plugin bug — confirmed by the identical action
+  succeeding immediately in a different browser, and by `Zotero: Test connection`
+  working fine in the same broken tab at the same time. Inconclusive on root cause, not
+  written up as a platform finding. It did surface a real gap while debugging it: the
+  per-item write loop had no `try/catch`, so any write failure for any reason would have
+  aborted the whole sync silently. Fixed — failures are now isolated per item and
+  reported in the final alert alongside the new/updated counts.

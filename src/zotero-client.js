@@ -18,6 +18,20 @@
 import { ZOTERO_API_BASE, ZOTERO_API_VERSION, DEFAULT_CITATION_STYLE } from "./constants.js";
 import { stripHtmlToText } from "./format-citation.js";
 
+/** Shared by syncItems and syncFilteredItems — same envelope, same fields sync needs. */
+function mapSyncItem(item) {
+  return {
+    key: item.key,
+    version: item.version,
+    title: item.data?.title || "(untitled)",
+    abstract: item.data?.abstractNote || "",
+    tags: (item.data?.tags || []).map((t) => t.tag),
+    citation: stripHtmlToText(item.citation),
+    bib: stripHtmlToText(item.bib),
+    url: item.links?.alternate?.href || null,
+  };
+}
+
 export class ZoteroApiError extends Error {
   constructor(status, body) {
     super(`Zotero API error: HTTP ${status}`);
@@ -152,14 +166,23 @@ export function createZoteroClient({
   }
 
   // Cached per client instance so a search doesn't cost two round trips every time —
-  // resolved once, lazily, the first time something needs it.
+  // resolved once, lazily, the first time something needs it. `pendingUserID` closes a
+  // real race: two callers resolving concurrently (e.g. configure-sync.js's
+  // Promise.all([listCollections(), listTags()])) would otherwise both see
+  // cachedUserID === null before either await settles, and both fire their own
+  // /keys/current request. Share the one in-flight request instead.
   let cachedUserID = userID ?? null;
+  let pendingUserID = null;
   async function resolveUserID() {
-    if (cachedUserID === null) {
-      const info = await keysCurrent();
-      cachedUserID = info.userID;
+    if (cachedUserID !== null) return cachedUserID;
+    if (!pendingUserID) {
+      pendingUserID = keysCurrent().then((info) => {
+        cachedUserID = info.userID;
+        pendingUserID = null;
+        return cachedUserID;
+      });
     }
-    return cachedUserID;
+    return pendingUserID;
   }
 
   /**
@@ -209,19 +232,62 @@ export function createZoteroClient({
       sinceVersion,
       pageSize,
     });
-    return {
-      lastModifiedVersion,
-      items: items.map((item) => ({
-        key: item.key,
-        version: item.version,
-        title: item.data?.title || "(untitled)",
-        abstract: item.data?.abstractNote || "",
-        tags: (item.data?.tags || []).map((t) => t.tag),
-        citation: stripHtmlToText(item.citation),
-        bib: stripHtmlToText(item.bib),
-        url: item.links?.alternate?.href || null,
-      })),
+    return { lastModifiedVersion, items: items.map(mapSyncItem) };
+  }
+
+  /** Zotero collections, for Phase 5's config picker and collection-scoped sync below.
+   * Collections have a stable `key`, unlike tags — see `listTags`. */
+  async function listCollections() {
+    const uid = await resolveUserID();
+    const { items } = await paginate(`/users/${uid}/collections`, { params: { include: "data" } });
+    return items.map((c) => ({ key: c.key, name: c.data?.name || "(untitled collection)" }));
+  }
+
+  /** Every tag name used anywhere in the library. Zotero has no separate tag id/key —
+   * a tag IS its name, which is also what `syncFilteredItems`'s `tag=` filter takes. */
+  async function listTags() {
+    const uid = await resolveUserID();
+    const { items } = await paginate(`/users/${uid}/tags`);
+    return [...new Set(items.map((t) => t.tag).filter(Boolean))].sort();
+  }
+
+  /**
+   * Phase 5: same shape as `syncItems`, scoped to selected collections and/or tags,
+   * unioned — "in any selected collection OR carrying any selected tag" (checking more
+   * boxes syncs more, matching how a filter checklist normally reads). Zotero has no
+   * single query expressing an OR across collection membership and tags, so this issues
+   * one request per selected collection (`/collections/<key>/items/top`, no `tag=` — see
+   * below) plus one more `/items/top?tag=` request if any tags are selected, then
+   * de-duplicates by item key. Costs roughly one extra Zotero request per selected
+   * collection on top of a plain sync — accepted since Configure sync only runs when the
+   * user changes what to sync, not on every Sync now.
+   *
+   * A collection-scoped request intentionally does NOT also pass `tag=`: doing so would
+   * narrow to "in this collection AND has this tag" (an AND), which is the opposite of
+   * the OR this is meant to express across the two different kinds of selection.
+   */
+  async function syncFilteredItems({ sinceVersion, collectionKeys = [], tagNames = [], pageSize = 50 } = {}) {
+    const uid = await resolveUserID();
+    const baseParams = { itemType: "-attachment", include: "data,citation,bib" };
+
+    const byKey = new Map();
+    let lastModifiedVersion = null;
+    const mergeIn = async (path, params) => {
+      const res = await paginate(path, { params, sinceVersion, pageSize });
+      if (res.lastModifiedVersion !== null) {
+        lastModifiedVersion = Math.max(lastModifiedVersion ?? 0, res.lastModifiedVersion);
+      }
+      for (const item of res.items) byKey.set(item.key, item);
     };
+
+    for (const key of collectionKeys) {
+      await mergeIn(`/users/${uid}/collections/${key}/items/top`, baseParams);
+    }
+    if (tagNames.length) {
+      await mergeIn(`/users/${uid}/items/top`, { ...baseParams, tag: tagNames.join(" || ") });
+    }
+
+    return { lastModifiedVersion, items: [...byKey.values()].map(mapSyncItem) };
   }
 
   /** One item's direct children (attachments, standalone notes) — `include: "data"` is
@@ -289,5 +355,16 @@ export function createZoteroClient({
     return { title: res.data?.data?.title || "(untitled)" };
   }
 
-  return { request, paginate, keysCurrent, searchItems, syncItems, getItemExtras, getItem };
+  return {
+    request,
+    paginate,
+    keysCurrent,
+    searchItems,
+    syncItems,
+    getItemExtras,
+    getItem,
+    listCollections,
+    listTags,
+    syncFilteredItems,
+  };
 }

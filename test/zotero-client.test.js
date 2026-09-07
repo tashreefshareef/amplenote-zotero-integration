@@ -199,6 +199,20 @@ describe("createZoteroClient#searchItems", () => {
     expect(fetchImpl.mock.calls[2][0].toString()).toContain("/users/16332327/items/top");
   });
 
+  test("two concurrent first-time calls share one keysCurrent request, not two", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 16332327 } })) // keysCurrent
+      .mockResolvedValueOnce(fakeResponse({ body: [itemFixture()] }))
+      .mockResolvedValueOnce(fakeResponse({ body: [itemFixture()] }));
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    await Promise.all([client.searchItems({ query: "a" }), client.searchItems({ query: "b" })]);
+
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(fetchImpl.mock.calls.filter((c) => c[0].toString().endsWith("/keys/current"))).toHaveLength(1);
+  });
+
   test("skips resolving the userID when it's already known", async () => {
     const fetchImpl = jest.fn().mockResolvedValue(fakeResponse({ body: [itemFixture()] }));
     const client = createZoteroClient({ apiKey: "k", userID: 16332327, fetchImpl });
@@ -430,5 +444,117 @@ describe("createZoteroClient#getItem", () => {
     const item = await client.getItem("ITEM1");
 
     expect(item.title).toBe("(untitled)");
+  });
+});
+
+describe("createZoteroClient#listCollections", () => {
+  test("returns key/name pairs", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(
+        fakeResponse({ body: [{ key: "C1", data: { name: "Psychology" } }, { key: "C2", data: { name: "AI" } }] })
+      );
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const collections = await client.listCollections();
+
+    expect(fetchImpl.mock.calls[1][0].toString()).toContain("/users/1/collections");
+    expect(collections).toEqual([
+      { key: "C1", name: "Psychology" },
+      { key: "C2", name: "AI" },
+    ]);
+  });
+});
+
+describe("createZoteroClient#listTags", () => {
+  test("returns deduplicated, sorted tag names", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(fakeResponse({ body: [{ tag: "favorite" }, { tag: "to-read" }, { tag: "favorite" }] }));
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const tags = await client.listTags();
+
+    expect(fetchImpl.mock.calls[1][0].toString()).toContain("/users/1/tags");
+    expect(tags).toEqual(["favorite", "to-read"]);
+  });
+});
+
+describe("createZoteroClient#syncFilteredItems", () => {
+  function itemFixture(key, title) {
+    return { key, data: { title }, citation: `<span>${title}</span>`, bib: `<div>${title}</div>` };
+  }
+
+  test("issues one request per selected collection and unions the results", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } })) // keysCurrent
+      .mockResolvedValueOnce(fakeResponse({ body: [itemFixture("A", "Item A")] })) // collection C1
+      .mockResolvedValueOnce(fakeResponse({ body: [itemFixture("B", "Item B")] })); // collection C2
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const result = await client.syncFilteredItems({ collectionKeys: ["C1", "C2"] });
+
+    expect(fetchImpl.mock.calls[1][0].toString()).toContain("/users/1/collections/C1/items/top");
+    expect(fetchImpl.mock.calls[2][0].toString()).toContain("/users/1/collections/C2/items/top");
+    expect(result.items.map((i) => i.key).sort()).toEqual(["A", "B"]);
+  });
+
+  test("de-duplicates an item present in more than one selected collection", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(fakeResponse({ body: [itemFixture("A", "Item A")] }))
+      .mockResolvedValueOnce(fakeResponse({ body: [itemFixture("A", "Item A")] }));
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const result = await client.syncFilteredItems({ collectionKeys: ["C1", "C2"] });
+
+    expect(result.items).toHaveLength(1);
+  });
+
+  test("adds one more request with tag= (joined with ||) when tags are selected too", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(fakeResponse({ body: [itemFixture("A", "Item A")] })) // collection C1
+      .mockResolvedValueOnce(fakeResponse({ body: [itemFixture("B", "Item B")] })); // tag-filtered items/top
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const result = await client.syncFilteredItems({ collectionKeys: ["C1"], tagNames: ["favorite", "to-read"] });
+
+    const tagUrl = new URL(fetchImpl.mock.calls[2][0].toString());
+    expect(tagUrl.pathname).toBe("/users/1/items/top");
+    expect(tagUrl.searchParams.get("tag")).toBe("favorite || to-read");
+    expect(result.items.map((i) => i.key).sort()).toEqual(["A", "B"]);
+  });
+
+  test("a collection-scoped request does not also carry tag= (union, not intersection)", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(fakeResponse({ body: [] }))
+      .mockResolvedValueOnce(fakeResponse({ body: [] }));
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    await client.syncFilteredItems({ collectionKeys: ["C1"], tagNames: ["favorite"] });
+
+    const collectionUrl = new URL(fetchImpl.mock.calls[1][0].toString());
+    expect(collectionUrl.searchParams.has("tag")).toBe(false);
+  });
+
+  test("takes the highest lastModifiedVersion across the merged requests", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(fakeResponse({ headers: { "Last-Modified-Version": "10" }, body: [] }))
+      .mockResolvedValueOnce(fakeResponse({ headers: { "Last-Modified-Version": "25" }, body: [] }));
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const result = await client.syncFilteredItems({ collectionKeys: ["C1", "C2"] });
+
+    expect(result.lastModifiedVersion).toBe(25);
   });
 });

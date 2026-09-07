@@ -5,6 +5,11 @@ export const ZOTERO_API_VERSION = "3";
 // sync with the plugin note's own metadata table — see docs/development.md.
 export const SETTING_ZOTERO_API_KEY = "Zotero API key";
 
+// Phase 5: which collections/tags to sync, as human-readable text (see sync-filter.js).
+// Also declared as a `setting | <label>` row — app.setSetting writes here need the row
+// to already exist, same as the API key.
+export const SETTING_ZOTERO_SYNC_FILTER = "Zotero sync filter";
+
 // Confirmed live against a real item (zotero-findings.md, 2026-09-05): include=citation,bib
 // with this style returns both fields populated.
 export const DEFAULT_CITATION_STYLE = "chicago-note-bibliography";

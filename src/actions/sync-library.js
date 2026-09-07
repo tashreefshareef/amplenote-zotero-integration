@@ -1,7 +1,28 @@
-import { SETTING_ZOTERO_API_KEY, HIGHLIGHTS_HEADING } from "../constants.js";
+import { SETTING_ZOTERO_API_KEY, SETTING_ZOTERO_SYNC_FILTER, HIGHLIGHTS_HEADING } from "../constants.js";
 import { createZoteroClient, describeZoteroError } from "../zotero-client.js";
 import { loadSyncState, saveSyncState } from "../sync-state.js";
 import { writeSection } from "../note-sections.js";
+import { parseFilterSetting, filterSignature } from "../sync-filter.js";
+
+/**
+ * Resolves the Phase 5 collections/tags filter into what `client.syncFilteredItems`
+ * needs (collection NAMES -> KEYS — the filter setting stores names, per api-notes.md
+ * #9c, so the text field stays human-typeable; Zotero's collection-scoped endpoint
+ * needs the key). Falls back to `client.syncItems` (unfiltered — this plugin's original
+ * behavior) when nothing is selected.
+ */
+async function fetchSyncItems(client, filter, sinceVersion) {
+  if (!filter.collections.length && !filter.tags.length) {
+    return client.syncItems({ sinceVersion });
+  }
+  let collectionKeys = [];
+  if (filter.collections.length) {
+    const all = await client.listCollections();
+    const wanted = filter.collections.map((n) => n.toLowerCase());
+    collectionKeys = all.filter((c) => wanted.includes(c.name.toLowerCase())).map((c) => c.key);
+  }
+  return client.syncFilteredItems({ sinceVersion, collectionKeys, tagNames: filter.tags });
+}
 
 function renderAnnotation(a) {
   const page = a.pageLabel ? ` (p. ${a.pageLabel})` : "";
@@ -97,9 +118,17 @@ export async function syncLibrary(app) {
   }
 
   const client = createZoteroClient({ apiKey });
+  const filter = parseFilterSetting(app.settings[SETTING_ZOTERO_SYNC_FILTER]);
+  const signature = filterSignature(filter);
+  // A changed filter needs a full resync, not an incremental one: an item that predates
+  // the last sync but only just became relevant under a newly-added collection/tag
+  // would never come back via since=, since its own metadata hasn't changed.
+  const filterChanged = state.filterSignature !== undefined && state.filterSignature !== signature;
+  const sinceVersion = filterChanged ? undefined : state.libraryVersion ?? undefined;
+
   let result;
   try {
-    result = await client.syncItems({ sinceVersion: state.libraryVersion ?? undefined });
+    result = await fetchSyncItems(client, filter, sinceVersion);
   } catch (e) {
     await app.alert(describeZoteroError(e));
     return;
@@ -173,6 +202,7 @@ export async function syncLibrary(app) {
   }
 
   if (result.lastModifiedVersion !== null) state.libraryVersion = result.lastModifiedVersion;
+  state.filterSignature = signature;
 
   try {
     await saveSyncState(app, state);

@@ -28,8 +28,8 @@ const KAHNEMAN = {
   links: { alternate: { href: "https://www.zotero.org/tashreef/items/ABCD1234" } },
 };
 
-function syncStateNote({ libraryVersion, items }) {
-  const json = JSON.stringify({ libraryVersion, items });
+function syncStateNote({ libraryVersion, items, filterSignature }) {
+  const json = JSON.stringify({ libraryVersion, items, filterSignature });
   return {
     uuid: "sync-note-1",
     name: "Zotero Sync",
@@ -325,5 +325,68 @@ describe("syncLibrary", () => {
 
     expect(app._calls.alerts[0]).toMatch(/rate-limited/i);
     expect(app._calls.createdNotes).toHaveLength(0);
+  });
+
+  describe("Phase 5 filtering", () => {
+    test("with a collections+tags filter set, routes through the filtered fetch instead of the plain one", async () => {
+      const app = createMockApp({
+        settings: { "Zotero API key": "k", "Zotero sync filter": "Collections: Psychology\nTags: favorite" },
+      });
+      const fetchImpl = mockFetchSequence(
+        fakeResponse({ body: { userID: 1 } }), // keysCurrent
+        fakeResponse({ body: [{ key: "C1", data: { name: "Psychology" } }] }), // listCollections
+        fakeResponse({ headers: { "Last-Modified-Version": "5" }, body: [KAHNEMAN] }), // collection C1
+        fakeResponse({ body: [] }) // tag-filtered items/top
+      );
+
+      await syncLibrary(app);
+
+      expect(fetchImpl.mock.calls[1][0].toString()).toContain("/users/1/collections"); // listCollections, not items/top
+      const collectionUrl = fetchImpl.mock.calls[2][0].toString();
+      expect(collectionUrl).toContain("/users/1/collections/C1/items/top");
+      const tagUrl = new URL(fetchImpl.mock.calls[3][0].toString());
+      expect(tagUrl.searchParams.get("tag")).toBe("favorite");
+      expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 1 new, 0 updated, 0 highlights refreshed.");
+    });
+
+    test("a changed filter forces a full resync (since= omitted) even with a stored libraryVersion", async () => {
+      const app = createMockApp({
+        settings: { "Zotero API key": "k", "Zotero sync filter": "Tags: favorite" },
+        notes: [syncStateNote({ libraryVersion: 50, items: {}, filterSignature: '{"collections":[],"tags":["old-tag"]}' })],
+      });
+      const fetchImpl = mockFetchSequence(
+        fakeResponse({ body: { userID: 1 } }),
+        fakeResponse({ body: [] }) // tag-filtered items/top (no collections selected here)
+      );
+
+      await syncLibrary(app);
+
+      const url = new URL(fetchImpl.mock.calls[1][0].toString());
+      expect(url.searchParams.has("since")).toBe(false);
+    });
+
+    test("an unchanged filter still syncs incrementally, since= intact", async () => {
+      const signature = '{"collections":[],"tags":["favorite"]}';
+      const app = createMockApp({
+        settings: { "Zotero API key": "k", "Zotero sync filter": "Tags: favorite" },
+        notes: [syncStateNote({ libraryVersion: 50, items: {}, filterSignature: signature })],
+      });
+      const fetchImpl = mockFetchSequence(fakeResponse({ body: { userID: 1 } }), fakeResponse({ body: [] }));
+
+      await syncLibrary(app);
+
+      const url = new URL(fetchImpl.mock.calls[1][0].toString());
+      expect(url.searchParams.get("since")).toBe("50");
+    });
+
+    test("no filter set behaves exactly like Phase 3/4 (plain items/top, no extra requests)", async () => {
+      const app = createMockApp({ settings: { "Zotero API key": "k" } });
+      const fetchImpl = mockFetchSequence(fakeResponse({ body: { userID: 1 } }), fakeResponse({ body: [] }));
+
+      await syncLibrary(app);
+
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      expect(fetchImpl.mock.calls[1][0].toString()).toContain("/users/1/items/top");
+    });
   });
 });

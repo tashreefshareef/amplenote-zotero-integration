@@ -7,7 +7,11 @@ function extractJsonFence(sectionBody) {
 }
 
 function renderStateBody(state) {
-  const json = JSON.stringify({ libraryVersion: state.libraryVersion, items: state.items }, null, 2);
+  const json = JSON.stringify(
+    { libraryVersion: state.libraryVersion, items: state.items, filterSignature: state.filterSignature },
+    null,
+    2
+  );
   return `\nDo not edit by hand — this section stores this plugin's sync bookkeeping as JSON.\n\n\`\`\`json\n${json}\n\`\`\`\n`;
 }
 
@@ -54,6 +58,7 @@ export async function loadSyncState(app) {
     noteUUID: note.uuid,
     libraryVersion: parsed?.libraryVersion ?? null,
     items: parsed?.items ?? {},
+    filterSignature: parsed?.filterSignature,
   };
 }
 

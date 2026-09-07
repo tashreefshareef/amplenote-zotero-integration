@@ -4,17 +4,17 @@ import { renderFilterSetting } from "../sync-filter.js";
 
 /**
  * "Zotero: Configure sync" (Phase 5). Bounty's own wording: "select which collections,
- * tags... should be synced."
+ * tags, and categories should be synced." "Categories" maps onto Zotero's item type
+ * (Journal Article, Book, Document, ...) — `client.listItemTypes()`.
  *
  * CONFIRMED LIVE, 2026-09-07: `app.prompt`'s `checkbox` input type is a single ON/OFF
  * toggle — it does NOT take an `options` array the way `select` does (Phase 0 spike #4).
  * Declaring one checkbox input labeled "Collections" with an `options` array rendered as
  * exactly one checkbox named "Collections", the array silently ignored. So this declares
- * one checkbox input PER selectable name (prefixed "Collection: "/"Tag: " since
- * `app.prompt` has no section-heading input to visually group them), and reads the
- * result positionally — collections first, then tags, matching declaration order.
- * `app.prompt` still didn't need an embed after all; it just needed the right input
- * shape.
+ * one checkbox input PER selectable name (prefixed "Collection: "/"Tag: "/"Category: "
+ * since `app.prompt` has no section-heading input to visually group them), and reads the
+ * result positionally — collections, then tags, then categories, matching declaration
+ * order.
  *
  * Doesn't pre-fill the picker with the currently-active selection — a `value` pre-fill
  * for a prompt input is a separate, still-unconfirmed assumption.
@@ -29,21 +29,27 @@ export async function configureSync(app) {
   const client = createZoteroClient({ apiKey });
   let collections;
   let tags;
+  let categories;
   try {
-    [collections, tags] = await Promise.all([client.listCollections(), client.listTags()]);
+    [collections, tags, categories] = await Promise.all([
+      client.listCollections(),
+      client.listTags(),
+      client.listItemTypes(),
+    ]);
   } catch (e) {
     await app.alert(describeZoteroError(e));
     return;
   }
 
-  if (!collections.length && !tags.length) {
-    await app.alert("No collections or tags found in your Zotero library — nothing to filter by.");
+  if (!collections.length && !tags.length && !categories.length) {
+    await app.alert("No collections, tags, or categories found in your Zotero library — nothing to filter by.");
     return;
   }
 
   const inputs = [
     ...collections.map((c) => ({ label: `Collection: ${c.name}`, type: "checkbox" })),
     ...tags.map((t) => ({ label: `Tag: ${t}`, type: "checkbox" })),
+    ...categories.map((c) => ({ label: `Category: ${c.name}`, type: "checkbox" })),
   ];
 
   const result = await app.prompt("Choose what to sync — leave everything unchecked to sync your whole library", { inputs });
@@ -52,8 +58,15 @@ export async function configureSync(app) {
   const checked = Array.isArray(result) ? result : [result];
   const selectedCollections = collections.filter((_, i) => checked[i]).map((c) => c.name);
   const selectedTags = tags.filter((_, i) => checked[collections.length + i]).map((t) => t);
+  const selectedCategories = categories
+    .filter((_, i) => checked[collections.length + tags.length + i])
+    .map((c) => c.name);
 
-  const settingValue = renderFilterSetting({ collections: selectedCollections, tags: selectedTags });
+  const settingValue = renderFilterSetting({
+    collections: selectedCollections,
+    tags: selectedTags,
+    categories: selectedCategories,
+  });
 
   try {
     await app.setSetting(SETTING_ZOTERO_SYNC_FILTER, settingValue);

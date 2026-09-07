@@ -5,23 +5,34 @@ import { writeSection } from "../note-sections.js";
 import { parseFilterSetting, filterSignature } from "../sync-filter.js";
 
 /**
- * Resolves the Phase 5 collections/tags filter into what `client.syncFilteredItems`
- * needs (collection NAMES -> KEYS — the filter setting stores names, per api-notes.md
- * #9c, so the text field stays human-typeable; Zotero's collection-scoped endpoint
- * needs the key). Falls back to `client.syncItems` (unfiltered — this plugin's original
- * behavior) when nothing is selected.
+ * Resolves the Phase 5 collections/tags/categories filter into what
+ * `client.syncFilteredItems` needs. Collection NAMES -> KEYS (Zotero's collection-scoped
+ * endpoint needs the key) and category NAMES -> Zotero's raw `itemType` values both need
+ * a fresh lookup each run — the filter setting stores human-readable names, per
+ * api-notes.md #9c, so the text field stays human-typeable. Falls back to
+ * `client.syncItems` (unfiltered — this plugin's original behavior) when nothing is
+ * selected.
  */
 async function fetchSyncItems(client, filter, sinceVersion) {
-  if (!filter.collections.length && !filter.tags.length) {
+  if (!filter.collections.length && !filter.tags.length && !filter.categories.length) {
     return client.syncItems({ sinceVersion });
   }
+
   let collectionKeys = [];
   if (filter.collections.length) {
     const all = await client.listCollections();
     const wanted = filter.collections.map((n) => n.toLowerCase());
     collectionKeys = all.filter((c) => wanted.includes(c.name.toLowerCase())).map((c) => c.key);
   }
-  return client.syncFilteredItems({ sinceVersion, collectionKeys, tagNames: filter.tags });
+
+  let itemTypes = [];
+  if (filter.categories.length) {
+    const all = await client.listItemTypes();
+    const wanted = filter.categories.map((n) => n.toLowerCase());
+    itemTypes = all.filter((c) => wanted.includes(c.name.toLowerCase())).map((c) => c.itemType);
+  }
+
+  return client.syncFilteredItems({ sinceVersion, collectionKeys, tagNames: filter.tags, itemTypes });
 }
 
 function renderAnnotation(a) {

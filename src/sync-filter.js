@@ -7,9 +7,12 @@
  *
  *   Collections: Psychology, AI Research
  *   Tags: favorite, to-read
+ *   Categories: Journal Article, Book
  *
- * Either line may be absent. No lines (or an empty setting) means no filter — sync the
- * whole library, matching this plugin's original, pre-Phase-5 behavior.
+ * Any line may be absent. No lines (or an empty setting) means no filter — sync the
+ * whole library, matching this plugin's original, pre-Phase-5 behavior. "Categories" is
+ * Zotero's item type (Journal Article, Book, Document, ...) — the bounty's own wording
+ * for a third selection axis alongside collections and tags.
  */
 
 function splitNames(text) {
@@ -22,30 +25,35 @@ function splitNames(text) {
 export function parseFilterSetting(raw) {
   const collections = [];
   const tags = [];
+  const categories = [];
   for (const line of (raw || "").split("\n")) {
     const collectionsMatch = line.match(/^\s*Collections?:\s*(.+)$/i);
     const tagsMatch = line.match(/^\s*Tags?:\s*(.+)$/i);
+    const categoriesMatch = line.match(/^\s*Categor(?:y|ies):\s*(.+)$/i);
     if (collectionsMatch) collections.push(...splitNames(collectionsMatch[1]));
     else if (tagsMatch) tags.push(...splitNames(tagsMatch[1]));
+    else if (categoriesMatch) categories.push(...splitNames(categoriesMatch[1]));
   }
-  return { collections, tags };
+  return { collections, tags, categories };
 }
 
-export function renderFilterSetting({ collections = [], tags = [] }) {
+export function renderFilterSetting({ collections = [], tags = [], categories = [] }) {
   const lines = [];
   if (collections.length) lines.push(`Collections: ${collections.join(", ")}`);
   if (tags.length) lines.push(`Tags: ${tags.join(", ")}`);
+  if (categories.length) lines.push(`Categories: ${categories.join(", ")}`);
   return lines.join("\n");
 }
 
 /** A normalized, order-independent signature — used to detect that the ACTIVE filter
  * changed since the last sync (sync-library.js), which forces a full resync rather than
  * an incremental one: an item that predates the last sync but only just became relevant
- * under a NEWLY added collection/tag would never appear via `since=`, since its own
- * metadata hasn't changed. */
+ * under a NEWLY added collection/tag/category would never appear via `since=`, since its
+ * own metadata hasn't changed. */
 export function filterSignature(filter) {
   return JSON.stringify({
     collections: [...filter.collections].sort(),
     tags: [...filter.tags].sort(),
+    categories: [...(filter.categories || [])].sort(),
   });
 }

@@ -482,6 +482,40 @@ describe("createZoteroClient#listTags", () => {
   });
 });
 
+describe("createZoteroClient#listItemTypes", () => {
+  test("returns itemType/name pairs, excluding attachment and note", async () => {
+    const fetchImpl = jest.fn().mockResolvedValueOnce(
+      fakeResponse({
+        body: [
+          { itemType: "journalArticle", localized: "Journal Article" },
+          { itemType: "attachment", localized: "Attachment" },
+          { itemType: "note", localized: "Note" },
+          { itemType: "book", localized: "Book" },
+        ],
+      })
+    );
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const types = await client.listItemTypes();
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1); // no /keys/current -- a global, unauthenticated schema endpoint
+    expect(new URL(fetchImpl.mock.calls[0][0].toString()).pathname).toBe("/itemTypes");
+    expect(types).toEqual([
+      { itemType: "journalArticle", name: "Journal Article" },
+      { itemType: "book", name: "Book" },
+    ]);
+  });
+
+  test("falls back to the raw itemType key when localized is missing", async () => {
+    const fetchImpl = jest.fn().mockResolvedValueOnce(fakeResponse({ body: [{ itemType: "map" }] }));
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const [type] = await client.listItemTypes();
+
+    expect(type).toEqual({ itemType: "map", name: "map" });
+  });
+});
+
 describe("createZoteroClient#syncFilteredItems", () => {
   function itemFixture(key, title) {
     return { key, data: { title }, citation: `<span>${title}</span>`, bib: `<div>${title}</div>` };
@@ -556,5 +590,38 @@ describe("createZoteroClient#syncFilteredItems", () => {
     const result = await client.syncFilteredItems({ collectionKeys: ["C1", "C2"] });
 
     expect(result.lastModifiedVersion).toBe(25);
+  });
+
+  test("adds one more request with itemType= (joined with ||) when categories are selected too", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(fakeResponse({ body: [itemFixture("A", "Item A")] })); // itemType-filtered items/top
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const result = await client.syncFilteredItems({ itemTypes: ["journalArticle", "book"] });
+
+    const url = new URL(fetchImpl.mock.calls[1][0].toString());
+    expect(url.pathname).toBe("/users/1/items/top");
+    expect(url.searchParams.get("itemType")).toBe("journalArticle || book");
+    expect(result.items.map((i) => i.key)).toEqual(["A"]);
+  });
+
+  test("de-duplicates across all three filter dimensions", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(fakeResponse({ body: [itemFixture("A", "Item A")] })) // collection
+      .mockResolvedValueOnce(fakeResponse({ body: [itemFixture("A", "Item A")] })) // tag
+      .mockResolvedValueOnce(fakeResponse({ body: [itemFixture("A", "Item A")] })); // category
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const result = await client.syncFilteredItems({
+      collectionKeys: ["C1"],
+      tagNames: ["favorite"],
+      itemTypes: ["journalArticle"],
+    });
+
+    expect(result.items).toHaveLength(1);
   });
 });

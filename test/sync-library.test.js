@@ -349,6 +349,25 @@ describe("syncLibrary", () => {
       expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 1 new, 0 updated, 0 highlights refreshed.");
     });
 
+    test("with only a categories filter set, resolves item types and routes through the filtered fetch", async () => {
+      const app = createMockApp({
+        settings: { "Zotero API key": "k", "Zotero sync filter": "Categories: Journal Article" },
+      });
+      const fetchImpl = mockFetchSequence(
+        fakeResponse({ body: [{ itemType: "journalArticle", localized: "Journal Article" }] }), // listItemTypes
+        fakeResponse({ body: { userID: 1 } }), // keysCurrent (inside syncFilteredItems)
+        fakeResponse({ headers: { "Last-Modified-Version": "5" }, body: [KAHNEMAN] }) // itemType-filtered items/top
+      );
+
+      await syncLibrary(app);
+
+      expect(new URL(fetchImpl.mock.calls[0][0].toString()).pathname).toBe("/itemTypes");
+      const url = new URL(fetchImpl.mock.calls[2][0].toString());
+      expect(url.pathname).toBe("/users/1/items/top");
+      expect(url.searchParams.get("itemType")).toBe("journalArticle");
+      expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 1 new, 0 updated, 0 highlights refreshed.");
+    });
+
     test("a changed filter forces a full resync (since= omitted) even with a stored libraryVersion", async () => {
       const app = createMockApp({
         settings: { "Zotero API key": "k", "Zotero sync filter": "Tags: favorite" },
@@ -366,7 +385,7 @@ describe("syncLibrary", () => {
     });
 
     test("an unchanged filter still syncs incrementally, since= intact", async () => {
-      const signature = '{"collections":[],"tags":["favorite"]}';
+      const signature = '{"collections":[],"tags":["favorite"],"categories":[]}';
       const app = createMockApp({
         settings: { "Zotero API key": "k", "Zotero sync filter": "Tags: favorite" },
         notes: [syncStateNote({ libraryVersion: 50, items: {}, filterSignature: signature })],

@@ -252,21 +252,45 @@ export function createZoteroClient({
   }
 
   /**
-   * Phase 5: same shape as `syncItems`, scoped to selected collections and/or tags,
-   * unioned — "in any selected collection OR carrying any selected tag" (checking more
-   * boxes syncs more, matching how a filter checklist normally reads). Zotero has no
-   * single query expressing an OR across collection membership and tags, so this issues
-   * one request per selected collection (`/collections/<key>/items/top`, no `tag=` — see
-   * below) plus one more `/items/top?tag=` request if any tags are selected, then
-   * de-duplicates by item key. Costs roughly one extra Zotero request per selected
-   * collection on top of a plain sync — accepted since Configure sync only runs when the
-   * user changes what to sync, not on every Sync now.
-   *
-   * A collection-scoped request intentionally does NOT also pass `tag=`: doing so would
-   * narrow to "in this collection AND has this tag" (an AND), which is the opposite of
-   * the OR this is meant to express across the two different kinds of selection.
+   * Zotero's fixed catalog of item types — the bounty's "categories" axis. Unlike
+   * collections/tags this is a global schema endpoint, not scoped to `/users/<uid>` or
+   * to what's actually used in this library (no auth/userID needed at all). `attachment`
+   * and `note` are excluded from what's returned: neither is ever synced as its own
+   * top-level item note (see `syncItems`'s hard `itemType: "-attachment"`), so offering
+   * them as selectable "categories" would be a checkbox that can never do anything.
    */
-  async function syncFilteredItems({ sinceVersion, collectionKeys = [], tagNames = [], pageSize = 50 } = {}) {
+  async function listItemTypes() {
+    const { items } = await paginate("/itemTypes");
+    return items
+      .filter((t) => t.itemType !== "attachment" && t.itemType !== "note")
+      .map((t) => ({ itemType: t.itemType, name: t.localized || t.itemType }));
+  }
+
+  /**
+   * Phase 5: same shape as `syncItems`, scoped to selected collections, tags, and/or
+   * item types ("categories" in the bounty's wording), unioned — "in any selected
+   * collection, OR carrying any selected tag, OR of any selected type" (checking more
+   * boxes syncs more, matching how a filter checklist normally reads). Zotero has no
+   * single query expressing an OR across these different kinds of criteria, so this
+   * issues one request per selected collection (`/collections/<key>/items/top`) plus one
+   * more `/items/top?tag=` request if any tags are selected, plus one more
+   * `/items/top?itemType=` request if any types are selected, then de-duplicates by item
+   * key. Costs roughly one extra Zotero request per selected collection (plus up to two
+   * more) on top of a plain sync — accepted since Configure sync only runs when the user
+   * changes what to sync, not on every Sync now.
+   *
+   * None of these requests also carries one of the OTHER filters: a collection-scoped
+   * request narrowed by `tag=` (or `itemType=`) would mean "in this collection AND has
+   * this tag," an AND, which is the opposite of the OR this is meant to express across
+   * different kinds of selection.
+   */
+  async function syncFilteredItems({
+    sinceVersion,
+    collectionKeys = [],
+    tagNames = [],
+    itemTypes = [],
+    pageSize = 50,
+  } = {}) {
     const uid = await resolveUserID();
     const baseParams = { itemType: "-attachment", include: "data,citation,bib" };
 
@@ -285,6 +309,9 @@ export function createZoteroClient({
     }
     if (tagNames.length) {
       await mergeIn(`/users/${uid}/items/top`, { ...baseParams, tag: tagNames.join(" || ") });
+    }
+    if (itemTypes.length) {
+      await mergeIn(`/users/${uid}/items/top`, { include: "data,citation,bib", itemType: itemTypes.join(" || ") });
     }
 
     return { lastModifiedVersion, items: [...byKey.values()].map(mapSyncItem) };
@@ -365,6 +392,7 @@ export function createZoteroClient({
     getItem,
     listCollections,
     listTags,
+    listItemTypes,
     syncFilteredItems,
   };
 }

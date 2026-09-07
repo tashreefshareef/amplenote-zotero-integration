@@ -315,19 +315,28 @@ least one item has a PDF with highlights, and check:
   its note's Highlights section should show the change, with the rest of the note
   untouched.
 
-## Phase 5: sync filter (collections + tags) — live-verified, 2026-09-07
+## Phase 5: sync filter (collections + tags + categories) — live-verified, 2026-09-07
 
-`Zotero: Configure sync` fetches your collections and tags, offers them as `app.prompt`
-checkbox inputs, and writes the selection to the `Zotero sync filter` setting as
-human-readable text (`Collections: X, Y` / `Tags: A, B`, per api-notes.md #9c — store
-what a human would type, since the text field stays visible and editable). `Zotero: Sync
-now` reads that setting every run: nothing selected syncs the whole library exactly as
-before; anything selected routes through `client.syncFilteredItems` instead of
-`syncItems`, unioning one request per selected collection with a `tag=` filtered request,
+`Zotero: Configure sync` fetches your collections, tags, and categories (Zotero's item
+types — Journal Article, Book, Document, ...; the bounty's own third named axis
+alongside collections and tags), offers them as `app.prompt` checkbox inputs, and writes
+the selection to the `Zotero sync filter` setting as human-readable text
+(`Collections: X, Y` / `Tags: A, B` / `Categories: Journal Article, Book`, per
+api-notes.md #9c — store what a human would type, since the text field stays visible
+and editable). `Zotero: Sync now` reads that setting every run: nothing selected syncs
+the whole library exactly as before; anything selected routes through
+`client.syncFilteredItems` instead of `syncItems`, unioning one request per selected
+collection with a `tag=` filtered request and an `itemType=` filtered request,
 de-duplicated by item key. Changing the filter between runs forces a full resync
 (`since=` omitted) rather than an incremental one — an item that predates the last sync
-but only just became relevant under a newly-added collection/tag would never come back
-via `since=` otherwise, since its own metadata hasn't changed.
+but only just became relevant under a newly-added collection/tag/category would never
+come back via `since=` otherwise, since its own metadata hasn't changed.
+
+Categories was originally cut when Phase 5 was first scoped (the trimmed-build plan said
+"collections and tags, nothing more") — added afterward once it was clear there was no
+platform reason to leave it out: `GET /itemTypes` is a fixed, unauthenticated schema
+endpoint, and item-type filtering reuses the exact same OR-union pattern already built
+and tested for tags.
 
 **CONFIRMED LIVE, 2026-09-07: `app.prompt`'s `checkbox` input type is a single ON/OFF
 toggle, not a multi-select list.** The first build declared one `checkbox` input labeled
@@ -357,6 +366,8 @@ that same run, which is correct, not a leak: an item outside the current filter 
 alone (not deleted, not newly created/rewritten), and the highlights-refresh pass
 intentionally covers every previously-synced item regardless of the active filter.
 
-Phase 5 is done. Not yet exercised: a filter selecting collections/tags that overlap
-only partially (some shared items, some exclusive to one side) — everything tested so
-far was either "everything matches" or "exactly one item matches."
+Phase 5 is done, including categories. Not yet exercised live: the categories dimension
+specifically (added after the collections/tags live test above, covered only by Jest
+against the mock so far), and a filter selecting collections/tags/categories that overlap
+only partially (some shared items, some exclusive to one side) — everything tested live
+so far was either "everything matches" or "exactly one item matches."

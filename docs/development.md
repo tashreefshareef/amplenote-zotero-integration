@@ -315,7 +315,7 @@ least one item has a PDF with highlights, and check:
   its note's Highlights section should show the change, with the rest of the note
   untouched.
 
-## Phase 5: sync filter (collections + tags) — implemented, one real unverified bet
+## Phase 5: sync filter (collections + tags) — checkbox mechanism confirmed, sync not yet re-tested
 
 `Zotero: Configure sync` fetches your collections and tags, offers them as `app.prompt`
 checkbox inputs, and writes the selection to the `Zotero sync filter` setting as
@@ -329,34 +329,29 @@ de-duplicated by item key. Changing the filter between runs forces a full resync
 but only just became relevant under a newly-added collection/tag would never come back
 via `since=` otherwise, since its own metadata hasn't changed.
 
-**The one real gamble: `app.prompt`'s `checkbox` input type has never been tested in this
-project.** The roadmap originally assumed Phase 5 needed an embed, based on api-notes.md
-#9c's finding that the *settings page itself* has no picker — but that's a different
-surface from `app.prompt`, which separately declares `checkbox` and `tags` input types,
-untested by Phase 0's spike #4 (that spike only confirmed `select`). This action is built
-betting `checkbox` behaves like `select` did — given an `options` array, rendering a real
-multi-select list, and returning an array of the checked values at that input's position
-in the result. **If that bet is wrong, this whole action needs rebuilding as an embed** —
-find out before trusting anything else about this phase.
+**CONFIRMED LIVE, 2026-09-07: `app.prompt`'s `checkbox` input type is a single ON/OFF
+toggle, not a multi-select list.** The first build declared one `checkbox` input labeled
+"Collections" carrying an `options` array (the `select` pattern from Phase 0 spike #4) —
+live, that rendered as exactly ONE checkbox named "Collections", the array silently
+ignored. Rebuilt to declare one `checkbox` input per selectable name instead (prefixed
+`Collection: `/`Tag: ` since there's no section-heading input to group them), reading the
+boolean result positionally. `app.prompt` still didn't need an embed after all — see
+`api-notes.md`'s newly-confirmed `checkbox` entry.
 
 Doesn't pre-fill the picker with the currently-active selection (a `value` pre-fill for a
-prompt input is a second, separate unverified assumption — deliberately not stacked onto
-the first one; see configure-sync.js). Worth adding once `checkbox` itself is confirmed.
+prompt input is a separate, still-unconfirmed assumption — worth adding once checked).
 
-Found and fixed while building this, unrelated to the bet above but worth noting:
+Found and fixed while building this, unrelated to the checkbox question but worth noting:
 `Promise.all([client.listCollections(), client.listTags()])` exposed a real race in
 `resolveUserID` — two concurrent first-time callers would each see the cached userID as
 unresolved and both fire their own `/keys/current` request. Fixed by sharing the one
 in-flight request; covered by a regression test in `zotero-client.test.js`.
 
-Before trusting this phase, run `Zotero: Configure sync` and check:
-- Does a checkbox-style multi-select list actually render for collections and tags, or
-  something else entirely (a single toggle per option needing N separate inputs, plain
-  text, nothing at all)?
-- Does checking a few, saving, and reopening the setting show the expected
+Still needs a live check, now that the picker itself renders correctly:
+- Checking a few boxes, saving, and reopening the setting should show the expected
   `Collections: ...` / `Tags: ...` text in Account Settings → Plugins → this plugin →
-  Settings?
-- Does `Zotero: Sync now` afterward actually limit itself to the selected
+  Settings.
+- `Zotero: Sync now` afterward should actually limit itself to the selected
   collections/tags — new items outside the filter should NOT get synced, and previously
   synced items outside the new filter should be left alone (not deleted; deletion was
   never in scope).

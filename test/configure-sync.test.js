@@ -34,30 +34,27 @@ describe("configureSync", () => {
     expect(app._calls.alerts[0]).toMatch(/Zotero API key/i);
   });
 
-  test("offers collections and tags as checkbox options, saves the selection as human-readable text", async () => {
+  test("declares one checkbox input per collection/tag name, saves what's checked as human-readable text", async () => {
     const app = createMockApp({
       settings: { "Zotero API key": "k" },
-      promptQueue: [[["Psychology"], ["favorite"]]],
+      // Positional: [Psychology collection, AI collection, favorite tag, to-read tag]
+      promptQueue: [[true, false, true, false]],
     });
     mockFetchSequence(
       fakeResponse({ body: { userID: 1 } }), // keysCurrent
-      fakeResponse({ body: [{ key: "C1", data: { name: "Psychology" } }] }), // collections
-      fakeResponse({ body: [{ tag: "favorite" }] }) // tags
+      fakeResponse({ body: [{ key: "C1", data: { name: "Psychology" } }, { key: "C2", data: { name: "AI" } }] }),
+      fakeResponse({ body: [{ tag: "favorite" }, { tag: "to-read" }] })
     );
 
     await configureSync(app);
 
     const promptCall = app._calls.prompts[0];
-    expect(promptCall.options.inputs[0]).toMatchObject({
-      label: "Collections",
-      type: "checkbox",
-      options: [{ label: "Psychology", value: "Psychology" }],
-    });
-    expect(promptCall.options.inputs[1]).toMatchObject({
-      label: "Tags",
-      type: "checkbox",
-      options: [{ label: "favorite", value: "favorite" }],
-    });
+    expect(promptCall.options.inputs).toEqual([
+      { label: "Collection: Psychology", type: "checkbox" },
+      { label: "Collection: AI", type: "checkbox" },
+      { label: "Tag: favorite", type: "checkbox" },
+      { label: "Tag: to-read", type: "checkbox" },
+    ]);
 
     expect(app.settings["Zotero sync filter"]).toBe("Collections: Psychology\nTags: favorite");
     expect(app._calls.alerts.at(-1)).toMatch(/Collections: Psychology/);
@@ -66,12 +63,12 @@ describe("configureSync", () => {
   test("saves an empty filter (sync everything) when nothing is checked", async () => {
     const app = createMockApp({
       settings: { "Zotero API key": "k" },
-      promptQueue: [[[], []]],
+      promptQueue: [[false, false]],
     });
     mockFetchSequence(
       fakeResponse({ body: { userID: 1 } }),
-      fakeResponse({ body: [] }),
-      fakeResponse({ body: [] })
+      fakeResponse({ body: [{ key: "C1", data: { name: "Psychology" } }] }),
+      fakeResponse({ body: [{ tag: "favorite" }] })
     );
 
     await configureSync(app);
@@ -87,14 +84,24 @@ describe("configureSync", () => {
     });
     mockFetchSequence(
       fakeResponse({ body: { userID: 1 } }),
-      fakeResponse({ body: [] }),
-      fakeResponse({ body: [] })
+      fakeResponse({ body: [{ key: "C1", data: { name: "Psychology" } }] }),
+      fakeResponse({ body: [{ tag: "favorite" }] })
     );
 
     await configureSync(app);
 
     expect(app.settings["Zotero sync filter"]).toBe("Tags: favorite");
     expect(app._calls.alerts).toHaveLength(0);
+  });
+
+  test("alerts and skips the prompt when the library has no collections or tags at all", async () => {
+    const app = createMockApp({ settings: { "Zotero API key": "k" } });
+    mockFetchSequence(fakeResponse({ body: { userID: 1 } }), fakeResponse({ body: [] }), fakeResponse({ body: [] }));
+
+    await configureSync(app);
+
+    expect(app._calls.prompts).toHaveLength(0);
+    expect(app._calls.alerts[0]).toMatch(/nothing to filter by/i);
   });
 
   test("alerts a clear message when fetching collections/tags fails", async () => {

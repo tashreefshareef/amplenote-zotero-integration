@@ -51,11 +51,30 @@ export class ZoteroRateLimitedError extends Error {
 }
 
 /** Shared by every action that surfaces a Zotero call failure via app.alert. */
-export function describeZoteroError(e) {
+/**
+ * Shared by every action that surfaces a Zotero call failure via app.alert. Pass the
+ * `style` in use (if any) so an invalid CSL style gets named instead of misdiagnosed:
+ * confirmed live 2026-09-07, and reproduced against a public group, Zotero answers an
+ * unloadable style with **HTTP 500 "An error occurred"**, NOT 400 — and only once there
+ * is an item to render, so a bad style passes silently against an empty result set. The
+ * old blanket "Check the key is current" pointed at the wrong thing for every status
+ * except 403.
+ */
+export function describeZoteroError(e, { style } = {}) {
   if (e instanceof ZoteroRateLimitedError) {
     return `Zotero rate-limited this request — retry in ${e.retryAfterSeconds}s.`;
   }
-  if (e instanceof ZoteroApiError) return `Zotero API error (HTTP ${e.status}). Check the key is current.`;
+  if (e instanceof ZoteroApiError) {
+    if (e.status === 403) {
+      return "Zotero rejected the API key (HTTP 403). Check it's current and still has library access.";
+    }
+    const suspectStyle = style && style !== DEFAULT_CITATION_STYLE && e.status >= 500;
+    if (suspectStyle) {
+      return `Zotero couldn't render the citation (HTTP ${e.status}). Is "${style}" a valid Zotero style id? That's what this status usually means.`;
+    }
+    if (e.status >= 500) return `Zotero's server errored (HTTP ${e.status}). Worth retrying in a moment.`;
+    return `Zotero API error (HTTP ${e.status}).`;
+  }
   return `Could not reach Zotero: ${e.message}`;
 }
 

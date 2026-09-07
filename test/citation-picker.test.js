@@ -70,7 +70,7 @@ describe("pickCitation", () => {
     const result = await pickCitation(app);
 
     expect(result).toBeNull();
-    expect(app._calls.alerts[0]).toMatch(/Zotero API error/i);
+    expect(app._calls.alerts[0]).toMatch(/rejected the API key/i);
   });
 
   test("alerts when nothing matches the query", async () => {
@@ -199,16 +199,29 @@ describe("pickCitation — style and format settings", () => {
     expect(result.text).toBe("Kahneman. 2011.");
   });
 
-  test("hints at the style setting when Zotero rejects the request with a non-default style", async () => {
+  // Confirmed live 2026-09-07 and reproduced against a public group: Zotero answers an
+  // invalid CSL style with HTTP 500, not 400.
+  test("names the bad style on the 500 Zotero actually returns for one", async () => {
     const app = createMockApp({
       settings: { "Zotero API key": "k", "Zotero citation style": "not-a-style" },
       promptQueue: ["kahneman"],
     });
-    mockFetchSequence(fakeResponse({ body: { userID: 1 } }), fakeResponse({ status: 400 }));
+    mockFetchSequence(fakeResponse({ body: { userID: 1 } }), fakeResponse({ status: 500 }));
 
     await pickCitation(app);
 
     expect(app._calls.alerts[0]).toMatch(/Is "not-a-style" a valid Zotero style id/);
+    expect(app._calls.alerts[0]).not.toMatch(/key/i); // the key is not the problem here
+  });
+
+  test("does not blame the style for a 500 when the default style is in use", async () => {
+    const app = createMockApp({ settings: { "Zotero API key": "k" }, promptQueue: ["kahneman"] });
+    mockFetchSequence(fakeResponse({ body: { userID: 1 } }), fakeResponse({ status: 500 }));
+
+    await pickCitation(app);
+
+    expect(app._calls.alerts[0]).toMatch(/server errored/i);
+    expect(app._calls.alerts[0]).not.toMatch(/style id/);
   });
 });
 

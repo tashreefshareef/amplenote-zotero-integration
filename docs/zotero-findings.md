@@ -198,6 +198,34 @@ trip each.
    floor in `docs/roadmap.md` — worth roughly the ¾ day the roadmap already flagged for
    this outcome.
 
+## ⚠️ An invalid CSL style is an HTTP **500**, not a 400 — and only when there's an item to render
+
+Confirmed live 2026-09-07 (the plugin's own `style=` setting, pointed at `not-a-style`),
+then reproduced independently against a populated public group so it isn't specific to
+one library:
+
+```
+GET /groups/30/items/top?limit=1&include=citation&style=apa                        200
+GET /groups/30/items/top?limit=1&include=citation&style=chicago-note-bibliography  200
+GET /groups/30/items/top?limit=1&include=citation&style=not-a-style                500  "An error occurred"
+GET /groups/30/items/top?limit=1&include=citation&style=totally-bogus-xyz          500  "An error occurred"
+```
+
+Two things follow, and both cost a wrong error message before they were understood:
+
+1. **Don't validate a style by expecting a 4xx.** A bad style id is a server error, so
+   any code branching on `400` to mean "bad input" never fires. `describeZoteroError`
+   now names a non-default style as the likely cause of a 5xx.
+2. **An empty result set never validates the style at all.** The same bad style returns
+   `200 []` against a library with no matching items (`/groups/1/...` — an empty group —
+   returns `[]` for every style, valid or not). Zotero only loads the CSL style when it
+   has something to format, so a typo'd style can sit unnoticed until the first item
+   comes back.
+
+Related: the plugin's old blanket message for any `ZoteroApiError` was "Check the key is
+current," which is right only for 403. It now branches per status — 403 blames the key,
+5xx blames the server (or the style), everything else states the status plainly.
+
 ## Sources
 
 - Zotero Web API v3 basics — <https://www.zotero.org/support/dev/web_api/v3/basics>

@@ -488,10 +488,20 @@ then `<first title word><year>`, then the Zotero item key so it's never empty. A
 who needs BibTeX-exact keys fills in Zotero's Citation Key field and the fallback steps
 aside. Not attempting to reproduce BBT's configurable key formulas.
 
-Live check (redo after the two-select fix): set `Zotero citation style` to `apa` and
-leave `Zotero citation format` blank, run `Zotero: Search citation` — after picking a
-reference you should get a second "Insert as" prompt listing all five formats. Pick
-"Formatted citation (apa)" and the text should be APA-shaped, not Chicago; repeat
-picking Pandoc for `[@<author><year>]` and LaTeX for `\cite{...}`. Set the format
-setting to `pandoc` and the "Insert as" prompt should stop appearing. A bad style id
-should produce the hint naming the setting, not a bare "HTTP 400".
+**Confirmed live, 2026-09-07** (after the two-select fix): with `Zotero citation style`
+= `apa` and the format setting blank, the reference dropdown itself rendered
+`(Sahay et al., 2026)` — APA, not the Chicago form it showed before, so the style
+reaches the search request. The "Insert as" prompt listed all five formats; picking
+Formatted inserted `(Sahay et al., 2026)` and picking LaTeX inserted
+`\cite{sahay2026}` — so the derived cite key works on a real item whose Zotero Citation
+Key field is empty. Setting the format setting to a valid value stopped the prompt
+appearing, as designed.
+
+**A bad style id surfaced a real bug rather than the intended hint**, now fixed: the
+hint checked for HTTP 400, but Zotero answers an unloadable style with **HTTP 500**
+(reproduced independently against a public group — see `zotero-findings.md`), so the
+generic message fired instead and told the user to check their API key, which was fine.
+`describeZoteroError` now takes the style in use and branches per status: 403 blames the
+key, a 5xx with a non-default style names the style, other 5xx blames Zotero's server.
+Sync passes its style through too, since a bad style breaks sync the same way. Still
+worth re-checking live that a bogus style now names itself.

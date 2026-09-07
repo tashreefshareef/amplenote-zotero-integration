@@ -4,7 +4,7 @@ import {
   SETTING_ZOTERO_CITATION_FORMAT,
   DEFAULT_CITATION_STYLE,
 } from "../constants.js";
-import { createZoteroClient, describeZoteroError, ZoteroApiError } from "../zotero-client.js";
+import { createZoteroClient, describeZoteroError } from "../zotero-client.js";
 import { truncateForLabel } from "../format-citation.js";
 import { CITATION_FORMATS, normalizeFormat, formatCitation } from "../cite-key.js";
 
@@ -69,11 +69,7 @@ export async function pickCitation(app) {
   try {
     results = await client.searchItems({ query, style });
   } catch (e) {
-    const styleHint =
-      e instanceof ZoteroApiError && e.status === 400 && style !== DEFAULT_CITATION_STYLE
-        ? ` Is "${style}" a valid Zotero style id? (See the "${SETTING_ZOTERO_CITATION_STYLE}" setting.)`
-        : "";
-    await app.alert(describeZoteroError(e) + styleHint);
+    await app.alert(describeZoteroError(e, { style }));
     return null;
   }
   if (!results.length) {

@@ -218,7 +218,7 @@ export async function syncLibrary(app) {
   try {
     result = await fetchSyncItems(client, filter, sinceVersion, style);
   } catch (e) {
-    await app.alert(describeZoteroError(e));
+    await app.alert(describeZoteroError(e, { style }));
     return;
   }
 

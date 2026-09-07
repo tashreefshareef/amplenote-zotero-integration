@@ -129,6 +129,6 @@ describe("configureSync", () => {
 
     await configureSync(app);
 
-    expect(app._calls.alerts[0]).toMatch(/Zotero API error/i);
+    expect(app._calls.alerts[0]).toMatch(/rejected the API key/i);
   });
 });

@@ -16,7 +16,7 @@ ${JSON.stringify({libraryVersion:t.libraryVersion,items:t.items},null,2)}
 `}async function J(t){let e=await t.findNote({name:A});if(!e)return{noteUUID:null,libraryVersion:null,items:{}};let n=await t.getNoteContent({uuid:e.uuid});if(n==null)return{noteUUID:e.uuid,libraryVersion:null,items:{}};let r=L(n,E);if(r>1)throw new Error(`The "${A}" note has ${r} "${E}" sections \u2014 delete the extra one before syncing again.`);let o=r===1?F(n,E):null,i=o?lt(o):null,u=null;if(i)try{u=JSON.parse(i)}catch{u=null}return{noteUUID:e.uuid,libraryVersion:u?.libraryVersion??null,items:u?.items??{}}}async function z(t,e){let n=ut(e);if(!e.noteUUID){let r=await t.createNote(A);await t.insertNoteContent({uuid:r},`# ${E}
 ${n}`,{atEnd:!0}),e.noteUUID=r;return}await U(t,e.noteUUID,E,n,{noteLabel:`The "${A}" note`})}function dt(t){let e=t.pageLabel?` (p. ${t.pageLabel})`:"";return t.text?t.comment?`> ${t.text}${e}
 
-${t.comment}
+_Comment: ${t.comment}_
 `:`> ${t.text}${e}
 `:t.comment?`**Note${e}:** ${t.comment}
 `:`_${t.type||"annotation"}${e}_

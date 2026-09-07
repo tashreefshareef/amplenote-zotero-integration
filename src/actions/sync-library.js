@@ -5,7 +5,10 @@ import { writeSection } from "../note-sections.js";
 
 function renderAnnotation(a) {
   const page = a.pageLabel ? ` (p. ${a.pageLabel})` : "";
-  if (a.text) return a.comment ? `> ${a.text}${page}\n\n${a.comment}\n` : `> ${a.text}${page}\n`;
+  // Confirmed live, 2026-09-07: a comment on its own paragraph after the blockquote
+  // reads as an unrelated stray sentence, not a note on the highlight above it — label
+  // it explicitly rather than relying on adjacency to imply the connection.
+  if (a.text) return a.comment ? `> ${a.text}${page}\n\n_Comment: ${a.comment}_\n` : `> ${a.text}${page}\n`;
   if (a.comment) return `**Note${page}:** ${a.comment}\n`;
   return `_${a.type || "annotation"}${page}_\n`;
 }

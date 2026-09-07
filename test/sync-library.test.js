@@ -155,7 +155,7 @@ describe("syncLibrary", () => {
     expect(content).toContain('[View "Kahneman.pdf" in Zotero](https://www.zotero.org/tashreef/items/ATT1)');
     expect(content).toContain("## Highlights & Notes");
     expect(content).toContain("> System 1 and System 2 (p. 12)");
-    expect(content).toContain("key idea");
+    expect(content).toContain("_Comment: key idea_");
     expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 1 new, 0 updated, 0 highlights refreshed.");
   });
 

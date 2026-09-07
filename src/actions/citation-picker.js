@@ -34,15 +34,16 @@ function formatLabel(format, style) {
 /**
  * Search Zotero, let the user pick a result and an output format. Shared by the
  * insertText and appOption entry points below — they differ only in what happens to the
- * result, not in how it's found. Two separate app.prompt calls, not one: the spike
- * confirmed a select's options render once, statically, at prompt time — there's no live
+ * result, not in how it's found. Separate app.prompt calls, not one: the spike confirmed
+ * a select's options render once, statically, at prompt time — there's no live
  * re-population from what's typed in a sibling field within a single prompt.
  *
- * The citation STYLE (any CSL id Zotero's `style=` accepts) comes from a setting; the
- * FORMAT (cite-key.js's CITATION_FORMATS) defaults from a setting and can be changed per
- * pick via a second `select` — its options are ordered with the default first, since
- * whether a `select` can be pre-selected by value is unconfirmed, and a select that
- * returns nothing falls back to the setting anyway.
+ * The citation STYLE (any CSL id Zotero's `style=` accepts) comes from a setting. The
+ * FORMAT (cite-key.js's CITATION_FORMATS) comes from a setting when one is set — no
+ * extra prompt — and is otherwise asked for in its own single-select prompt after the
+ * reference is picked. Confirmed live, 2026-09-07: a prompt declaring TWO `select`
+ * inputs rendered only the first (a `string` + a `select` together is fine — Phase 0
+ * spike #4), so the format can't ride along in the results prompt as a second select.
  *
  * Returns the picked item plus `format` and `text` (the string to insert), or null.
  */
@@ -53,7 +54,8 @@ export async function pickCitation(app) {
     return null;
   }
   const style = (app.settings[SETTING_ZOTERO_CITATION_STYLE] || "").trim() || DEFAULT_CITATION_STYLE;
-  const defaultFormat = normalizeFormat(app.settings[SETTING_ZOTERO_CITATION_FORMAT]);
+  const rawFormat = (app.settings[SETTING_ZOTERO_CITATION_FORMAT] || "").trim().toLowerCase();
+  const fixedFormat = CITATION_FORMATS.includes(rawFormat) ? rawFormat : null;
 
   const queryResult = await app.prompt("Search Zotero", {
     inputs: [{ label: "Search", type: "string" }],
@@ -79,11 +81,6 @@ export async function pickCitation(app) {
     return null;
   }
 
-  const formatOptions = [defaultFormat, ...CITATION_FORMATS.filter((f) => f !== defaultFormat)].map((f) => ({
-    label: formatLabel(f, style),
-    value: f,
-  }));
-
   const pickResult = await app.prompt(`Results for "${query}"`, {
     inputs: [
       {
@@ -93,15 +90,27 @@ export async function pickCitation(app) {
         // shown in the dropdown is shortened.
         options: results.map((r) => ({ label: truncateForLabel(r.citation || r.title), value: r.key })),
       },
-      { label: "Format", type: "select", options: formatOptions },
     ],
   });
   if (pickResult === null) return null;
-  const [key, formatChoice] = Array.isArray(pickResult) ? pickResult : [pickResult];
-
-  const item = results.find((r) => r.key === key);
+  const item = results.find((r) => r.key === firstValue(pickResult));
   if (!item) return null;
-  const format = normalizeFormat(formatChoice || defaultFormat);
+
+  let format = fixedFormat;
+  if (!format) {
+    const formatResult = await app.prompt("Insert as", {
+      inputs: [
+        {
+          label: "Format",
+          type: "select",
+          options: CITATION_FORMATS.map((f) => ({ label: formatLabel(f, style), value: f })),
+        },
+      ],
+    });
+    if (formatResult === null) return null;
+    format = normalizeFormat(firstValue(formatResult));
+  }
+
   return { ...item, format, text: formatCitation(item, format) };
 }
 

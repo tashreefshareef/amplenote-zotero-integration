@@ -98,7 +98,7 @@ describe("pickCitation", () => {
   test("returns the matched result on a successful pick, offering the select by key", async () => {
     const app = createMockApp({
       settings: { "Zotero API key": "k" },
-      promptQueue: ["kahneman", "ABCD1234"],
+      promptQueue: ["kahneman", "ABCD1234", "formatted"],
     });
     mockFetchSequence(fakeResponse({ body: { userID: 1 } }), fakeResponse({ body: [KAHNEMAN] }));
 
@@ -113,17 +113,10 @@ describe("pickCitation", () => {
       text: "Kahneman, Thinking, Fast and Slow.",
     });
     const selectPrompt = app._calls.prompts[1];
+    // ONE select per prompt: confirmed live 2026-09-07 that a prompt declaring two
+    // selects renders only the first.
+    expect(selectPrompt.options.inputs).toHaveLength(1);
     expect(selectPrompt.options.inputs[0].type).toBe("select");
-    // Second select: output format, default first.
-    expect(selectPrompt.options.inputs[1].type).toBe("select");
-    expect(selectPrompt.options.inputs[1].options[0].value).toBe("formatted");
-    expect(selectPrompt.options.inputs[1].options.map((o) => o.value)).toEqual([
-      "formatted",
-      "bibliography",
-      "pandoc",
-      "latex",
-      "biblatex",
-    ]);
     expect(selectPrompt.options.inputs[0].options).toEqual([
       { label: "Kahneman, Thinking, Fast and Slow.", value: "ABCD1234" },
     ]);
@@ -135,35 +128,73 @@ describe("pickCitation — style and format settings", () => {
     jest.restoreAllMocks();
   });
 
-  test("sends the configured citation style and honors a per-pick format choice", async () => {
+  const WITH_CREATORS = {
+    ...KAHNEMAN,
+    data: { title: "Thinking, Fast and Slow", creators: [{ lastName: "Kahneman" }], date: "2011" },
+  };
+
+  test("sends the configured citation style, and a set format skips the format prompt entirely", async () => {
     const app = createMockApp({
       settings: { "Zotero API key": "k", "Zotero citation style": "apa", "Zotero citation format": "pandoc" },
-      promptQueue: ["kahneman", ["ABCD1234", "latex"]],
+      promptQueue: ["kahneman", "ABCD1234"],
     });
     const fetchImpl = mockFetchSequence(
       fakeResponse({ body: { userID: 1 } }),
-      fakeResponse({
-        body: [{ ...KAHNEMAN, data: { title: "Thinking, Fast and Slow", creators: [{ lastName: "Kahneman" }], date: "2011" } }],
-      })
+      fakeResponse({ body: [WITH_CREATORS] })
     );
 
     const result = await pickCitation(app);
 
     expect(new URL(fetchImpl.mock.calls[1][0].toString()).searchParams.get("style")).toBe("apa");
-    expect(app._calls.prompts[1].options.inputs[1].options[0].value).toBe("pandoc"); // setting's default first
+    expect(app._calls.prompts).toHaveLength(2); // search + reference only
+    expect(result.format).toBe("pandoc");
+    expect(result.text).toBe("[@kahneman2011]");
+  });
+
+  test("asks for the format in its own single-select prompt when no format setting is set", async () => {
+    const app = createMockApp({
+      settings: { "Zotero API key": "k" },
+      promptQueue: ["kahneman", "ABCD1234", "latex"],
+    });
+    mockFetchSequence(fakeResponse({ body: { userID: 1 } }), fakeResponse({ body: [WITH_CREATORS] }));
+
+    const result = await pickCitation(app);
+
+    expect(app._calls.prompts).toHaveLength(3);
+    const formatPrompt = app._calls.prompts[2];
+    expect(formatPrompt.options.inputs).toHaveLength(1);
+    expect(formatPrompt.options.inputs[0].type).toBe("select");
+    expect(formatPrompt.options.inputs[0].options.map((o) => o.value)).toEqual([
+      "formatted",
+      "bibliography",
+      "pandoc",
+      "latex",
+      "biblatex",
+    ]);
     expect(result.format).toBe("latex");
     expect(result.text).toBe("\\cite{kahneman2011}");
   });
 
-  test("falls back to the setting's default format when the format select returns nothing", async () => {
+  test("returns null when the format prompt is cancelled", async () => {
     const app = createMockApp({
-      settings: { "Zotero API key": "k", "Zotero citation format": "bibliography" },
-      promptQueue: ["kahneman", ["ABCD1234", undefined]],
+      settings: { "Zotero API key": "k" },
+      promptQueue: ["kahneman", "ABCD1234", null],
+    });
+    mockFetchSequence(fakeResponse({ body: { userID: 1 } }), fakeResponse({ body: [KAHNEMAN] }));
+
+    expect(await pickCitation(app)).toBeNull();
+  });
+
+  test("an unrecognized format setting is ignored, falling back to asking", async () => {
+    const app = createMockApp({
+      settings: { "Zotero API key": "k", "Zotero citation format": "nonsense" },
+      promptQueue: ["kahneman", "ABCD1234", "bibliography"],
     });
     mockFetchSequence(fakeResponse({ body: { userID: 1 } }), fakeResponse({ body: [KAHNEMAN] }));
 
     const result = await pickCitation(app);
 
+    expect(app._calls.prompts).toHaveLength(3);
     expect(result.format).toBe("bibliography");
     expect(result.text).toBe("Kahneman. 2011.");
   });
@@ -188,7 +219,7 @@ describe("insertCitationAtCursor", () => {
 
   test("returns the citation text for insertText substitution", async () => {
     const app = createMockApp({
-      settings: { "Zotero API key": "k" },
+      settings: { "Zotero API key": "k", "Zotero citation format": "formatted" },
       promptQueue: ["kahneman", "ABCD1234"],
     });
     mockFetchSequence(fakeResponse({ body: { userID: 1 } }), fakeResponse({ body: [KAHNEMAN] }));
@@ -216,7 +247,7 @@ describe("searchAndAppendCitation", () => {
   test("appends the citation to the note and alerts, on a successful pick", async () => {
     const app = createMockApp({
       notes: [{ uuid: "note-1", content: "Existing content\n" }],
-      settings: { "Zotero API key": "k" },
+      settings: { "Zotero API key": "k", "Zotero citation format": "formatted" },
       promptQueue: ["kahneman", "ABCD1234"],
     });
     mockFetchSequence(fakeResponse({ body: { userID: 1 } }), fakeResponse({ body: [KAHNEMAN] }));

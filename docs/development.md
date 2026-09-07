@@ -431,9 +431,13 @@ then on. The highlights-refresh pass now also refreshes Zotero Notes (a child no
 without any other edit is invisible to `since=` for the same reason a highlight is), but
 only on sectioned notes, so a legacy note doesn't get a section appended out of order.
 
-Live check: sync, type something under My Notes and add a heading of your own, change
-the item in Zotero, sync again — your text must still be there and the Reference section
-updated. Your 4 existing notes will migrate on their next item-level change.
+**Confirmed live, 2026-09-07.** All 4 existing notes migrated to the four-section layout
+on a forced full pass (`0 new, 4 updated`), and the qLDPC item's Zotero note ("Comment:
+56 + 12 pages, 9 total figures") imported under Zotero Notes. Then the real test: typed
+`My Test Line` under My Notes plus a user-added `## Scratch` section, edited the item's
+abstract in Zotero, re-synced (`0 new, 1 updated, 3 highlights refreshed`) — **both
+user-written pieces survived intact and the Reference section picked up the `EDITED`
+abstract.** The data-loss hazard is closed.
 
 ### Pass B: color label + page-precise Zotero link per highlight — implemented, not yet live-checked
 
@@ -449,11 +453,15 @@ Each highlight now reads `> **(Yellow)** text (p. 12) — [Open in Zotero](zoter
   link sends `pageIndex + 1`. The reference plugin gets its page number from an external
   extraction tool, so its convention couldn't be read off its source to confirm this.
 
-Two things only a live click can settle: whether Amplenote keeps a non-http
-`zotero://` link clickable at all (an `https://` link is confirmed; a custom scheme may
-be sanitized — if so, fall back to printing the bare URL), and whether `pageIndex + 1`
-lands on the right page. Check with the qLDPC highlight: its page label is 1, so the
-link should open the PDF on page 1.
+**Both confirmed live, 2026-09-07, and both were genuine unknowns:**
+- **Amplenote keeps a `zotero://` link clickable.** A custom (non-http) scheme survives
+  Amplenote's markdown link handling and its sanitizer — worth knowing generally, not
+  just for Zotero.
+- **`pageIndex + 1` is the right convention.** Clicking landed on the highlight's own
+  page in Zotero desktop.
+- The color label was verified against ground truth rather than just "a name appeared":
+  the highlight rendered **(Magenta)**, and Magenta is the color that highlight actually
+  has in Zotero.
 
 ### Pass C: citation style, formats, cite keys — implemented, not yet live-checked
 
@@ -461,10 +469,16 @@ The reference plugin's `Format` set — formatted citation, formatted bibliograp
 pandoc `[@key]`, LaTeX `\cite{key}`, BibLaTeX `\autocite{key}` — minus its free-form
 template. Two new optional settings (table above): the CSL **style** Zotero renders
 with (passed as `style=` to every citation/bib request, the picker's and sync's alike),
-and the picker's **default format**. The citation picker's results prompt gained a second
-`select`, "Format", so the format can be changed per pick; its options are ordered with
-the setting's default first, because whether a `select` can be pre-selected by value is
-unconfirmed, and a select that returns nothing falls back to the setting.
+and the picker's **default format**.
+
+**How the format is chosen, and why it isn't a second dropdown.** The first build put a
+"Format" `select` alongside the "Reference" `select` in the results prompt. Live, only
+the Reference dropdown rendered — the second `select` was silently dropped, no error,
+just absent (now `api-notes.md`'s "Two `select` inputs in ONE `app.prompt`" entry; a
+`string` + `select` still coexist fine, so this is specific to a second select). So:
+when the format setting is set, that format is used with **no extra prompt**; when it's
+blank, the format is asked in its **own follow-up single-select prompt** after the
+reference is picked — the shape already proven to render.
 
 **Cite keys** (`src/cite-key.js`): the reference plugin gets them from Better BibTeX,
 which has no equivalent here. Zotero 7's native Citation Key field (`citationKey`) is
@@ -474,8 +488,10 @@ then `<first title word><year>`, then the Zotero item key so it's never empty. A
 who needs BibTeX-exact keys fills in Zotero's Citation Key field and the fallback steps
 aside. Not attempting to reproduce BBT's configurable key formulas.
 
-Live check: set `Zotero citation style` to `apa`, run `Zotero: Search citation` — the
-inserted text should be APA-shaped; pick "Pandoc" in the Format select — you should get
-`[@<author><year>]`. A bad style id should produce the hint about the setting, not a
-bare "HTTP 400". Also worth confirming the two-`select` prompt returns
-`[referenceKey, format]` positionally, as the string+select spike did.
+Live check (redo after the two-select fix): set `Zotero citation style` to `apa` and
+leave `Zotero citation format` blank, run `Zotero: Search citation` — after picking a
+reference you should get a second "Insert as" prompt listing all five formats. Pick
+"Formatted citation (apa)" and the text should be APA-shaped, not Chicago; repeat
+picking Pandoc for `[@<author><year>]` and LaTeX for `\cite{...}`. Set the format
+setting to `pandoc` and the "Insert as" prompt should stop appearing. A bad style id
+should produce the hint naming the setting, not a bare "HTTP 400".

@@ -347,12 +347,25 @@ export function createZoteroClient({
       const grandchildren = await getChildren(attachment.key);
       for (const a of grandchildren) {
         if (a.data?.itemType !== "annotation") continue;
+        // `annotationPosition` is a JSON *string* on the wire: {"pageIndex": N, ...},
+        // 0-based. Parsed here so sync-library.js can build a page-precise
+        // zotero://open-pdf link without re-parsing.
+        let pageIndex = null;
+        try {
+          const pos = JSON.parse(a.data.annotationPosition || "{}");
+          if (Number.isInteger(pos.pageIndex)) pageIndex = pos.pageIndex;
+        } catch {
+          // leave null — the link degrades to the attachment without a page
+        }
         annotations.push({
           key: a.key,
+          attachmentKey: attachment.key,
           type: a.data.annotationType || "",
           text: a.data.annotationText || "",
           comment: a.data.annotationComment || "",
+          color: (a.data.annotationColor || "").toLowerCase(),
           pageLabel: a.data.annotationPageLabel || "",
+          pageIndex,
           sortIndex: a.data.annotationSortIndex || "",
         });
       }

@@ -156,4 +156,37 @@ describe("sectioned item notes", () => {
     expect(content).toContain("Old bib."); // Reference is NOT rewritten in the refresh pass
     expect(app._calls.alerts.at(-1)).toBe("Zotero sync complete: 0 new, 0 updated, 1 highlights refreshed.");
   });
+
+  test("a highlight renders its color name and a page-precise zotero://open-pdf link", async () => {
+    const app = createMockApp({ settings: { "Zotero API key": "k" } });
+    const attachment = { key: "ATT1", data: { itemType: "attachment", title: "paper.pdf" }, links: {} };
+    const highlight = {
+      key: "ANN1",
+      data: {
+        itemType: "annotation",
+        annotationType: "highlight",
+        annotationText: "System 1 and System 2",
+        annotationComment: "key idea",
+        annotationColor: "#ffd400",
+        annotationPageLabel: "12",
+        annotationPosition: JSON.stringify({ pageIndex: 12, rects: [] }),
+        annotationSortIndex: "00001",
+      },
+    };
+    mockFetchSequence(
+      fakeResponse({ body: { userID: 1 } }),
+      fakeResponse({ headers: { "Last-Modified-Version": "99" }, body: [KAHNEMAN] }),
+      fakeResponse({ body: [attachment] }),
+      fakeResponse({ body: [highlight] })
+    );
+
+    await syncLibrary(app);
+
+    const call = app._calls.createdNotes.find((c) => c.name === "Thinking, Fast and Slow");
+    const content = app._notes.get(call.uuid).content;
+    expect(content).toContain(
+      "> **(Yellow)** System 1 and System 2 (p. 12) — [Open in Zotero](zotero://open-pdf/library/items/ATT1?page=13)"
+    );
+    expect(content).toContain("_Comment: key idea_");
+  });
 });

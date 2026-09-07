@@ -46,3 +46,39 @@ describe("createZoteroClient#getItemExtras — Zotero child notes", () => {
     expect(extras.notes).toEqual([]);
   });
 });
+
+describe("createZoteroClient#getItemExtras — annotation color, page index, attachment key", () => {
+  test("carries the attachment key, lower-cased color, and pageIndex parsed from annotationPosition", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ body: { userID: 1 } }))
+      .mockResolvedValueOnce(fakeResponse({ body: [{ key: "ATT1", data: { itemType: "attachment", title: "x.pdf" } }] }))
+      .mockResolvedValueOnce(
+        fakeResponse({
+          body: [
+            {
+              key: "A1",
+              data: {
+                itemType: "annotation",
+                annotationType: "highlight",
+                annotationText: "t",
+                annotationColor: "#FFD400",
+                annotationPosition: '{"pageIndex":4,"rects":[[1,2,3,4]]}',
+                annotationSortIndex: "1",
+              },
+            },
+            {
+              key: "A2",
+              data: { itemType: "annotation", annotationType: "note", annotationComment: "c", annotationPosition: "not json", annotationSortIndex: "2" },
+            },
+          ],
+        })
+      );
+    const client = createZoteroClient({ apiKey: "k", fetchImpl });
+
+    const { annotations } = await client.getItemExtras("ITEM1");
+
+    expect(annotations[0]).toMatchObject({ attachmentKey: "ATT1", color: "#ffd400", pageIndex: 4 });
+    expect(annotations[1]).toMatchObject({ attachmentKey: "ATT1", color: "", pageIndex: null });
+  });
+});

@@ -426,3 +426,23 @@ only on sectioned notes, so a legacy note doesn't get a section appended out of 
 Live check: sync, type something under My Notes and add a heading of your own, change
 the item in Zotero, sync again — your text must still be there and the Reference section
 updated. Your 4 existing notes will migrate on their next item-level change.
+
+### Pass B: color label + page-precise Zotero link per highlight — implemented, not yet live-checked
+
+Each highlight now reads `> **(Yellow)** text (p. 12) — [Open in Zotero](zotero://open-pdf/library/items/<attachmentKey>?page=13)`.
+
+- **Color name** is the reference plugin's `colorCategory`, ported faithfully from its
+  `getColorCategory` (hue/saturation/lightness buckets — `src/annotation-color.js`), so
+  the two plugins name colors identically, custom colors included. Zotero's eight preset
+  colors map to Yellow / Red / Green / Blue / Purple / Magenta / Orange / Gray.
+- **The link** is the same `zotero://open-pdf` scheme the reference plugin emits; it
+  opens Zotero *desktop* at the page. Zotero's `annotationPosition` is a JSON string on
+  the wire with a 0-based `pageIndex`; the open-pdf scheme takes a 1-based page, so the
+  link sends `pageIndex + 1`. The reference plugin gets its page number from an external
+  extraction tool, so its convention couldn't be read off its source to confirm this.
+
+Two things only a live click can settle: whether Amplenote keeps a non-http
+`zotero://` link clickable at all (an `https://` link is confirmed; a custom scheme may
+be sanitized — if so, fall back to printing the bare URL), and whether `pageIndex + 1`
+lands on the right page. Check with the qLDPC highlight: its page label is 1, so the
+link should open the PDF on page 1.

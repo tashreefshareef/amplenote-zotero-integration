@@ -10,6 +10,21 @@ import { createZoteroClient, describeZoteroError } from "../zotero-client.js";
 import { loadSyncState, saveSyncState } from "../sync-state.js";
 import { writeSection, countHeadingOccurrences } from "../note-sections.js";
 import { parseFilterSetting, filterSignature } from "../sync-filter.js";
+import { colorCategory } from "../annotation-color.js";
+
+/**
+ * Deep link into Zotero *desktop* at the highlight's own page — the same
+ * `zotero://open-pdf/library/items/<attachmentKey>?page=N` the Obsidian reference plugin
+ * emits per annotation. `page` is best-effort: Zotero's `annotationPosition.pageIndex`
+ * is 0-based, and the open-pdf scheme takes a 1-based page number, so this sends
+ * `pageIndex + 1`. ⚠️ Unverified live on two counts: whether Amplenote keeps a
+ * `zotero://` (non-http) link clickable, and whether the +1 lands on the right page.
+ */
+function zoteroOpenLink(a) {
+  if (!a.attachmentKey) return "";
+  const page = Number.isInteger(a.pageIndex) ? `?page=${a.pageIndex + 1}` : "";
+  return `[Open in Zotero](zotero://open-pdf/library/items/${a.attachmentKey}${page})`;
+}
 
 /**
  * Resolves the Phase 5 collections/tags/categories filter into what
@@ -44,12 +59,21 @@ async function fetchSyncItems(client, filter, sinceVersion) {
 
 function renderAnnotation(a) {
   const page = a.pageLabel ? ` (p. ${a.pageLabel})` : "";
+  // Color name first, as the reference plugin does ("**(Yellow)** - text"), then the
+  // page-precise link on the same line so it stays attached to its highlight.
+  const color = colorCategory(a.color);
+  const label = color ? `**(${color})** ` : "";
+  const link = zoteroOpenLink(a);
+  const tail = link ? ` — ${link}` : "";
   // Confirmed live, 2026-09-07: a comment on its own paragraph after the blockquote
   // reads as an unrelated stray sentence, not a note on the highlight above it — label
   // it explicitly rather than relying on adjacency to imply the connection.
-  if (a.text) return a.comment ? `> ${a.text}${page}\n\n_Comment: ${a.comment}_\n` : `> ${a.text}${page}\n`;
-  if (a.comment) return `**Note${page}:** ${a.comment}\n`;
-  return `_${a.type || "annotation"}${page}_\n`;
+  if (a.text) {
+    const quote = `> ${label}${a.text}${page}${tail}\n`;
+    return a.comment ? `${quote}\n_Comment: ${a.comment}_\n` : quote;
+  }
+  if (a.comment) return `**Note${page}:** ${label}${a.comment}${tail}\n`;
+  return `_${a.type || "annotation"}${page}_${tail}\n`;
 }
 
 function renderAnnotations(annotations) {

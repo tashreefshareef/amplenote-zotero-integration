@@ -315,7 +315,7 @@ least one item has a PDF with highlights, and check:
   its note's Highlights section should show the change, with the rest of the note
   untouched.
 
-## Phase 5: sync filter (collections + tags) — checkbox mechanism confirmed, sync not yet re-tested
+## Phase 5: sync filter (collections + tags) — live-verified, 2026-09-07
 
 `Zotero: Configure sync` fetches your collections and tags, offers them as `app.prompt`
 checkbox inputs, and writes the selection to the `Zotero sync filter` setting as
@@ -347,11 +347,16 @@ Found and fixed while building this, unrelated to the checkbox question but wort
 unresolved and both fire their own `/keys/current` request. Fixed by sharing the one
 in-flight request; covered by a regression test in `zotero-client.test.js`.
 
-Still needs a live check, now that the picker itself renders correctly:
-- Checking a few boxes, saving, and reopening the setting should show the expected
-  `Collections: ...` / `Tags: ...` text in Account Settings → Plugins → this plugin →
-  Settings.
-- `Zotero: Sync now` afterward should actually limit itself to the selected
-  collections/tags — new items outside the filter should NOT get synced, and previously
-  synced items outside the new filter should be left alone (not deleted; deletion was
-  never in scope).
+**Filtering confirmed live too, against a real 4-item library.** Checking the one
+collection both items belonged to (`My Articles`) saved correctly and, on sync, reported
+`4 updated` — every item matched, which on its own doesn't distinguish "the filter
+works" from "the filter is a no-op." The real test: switching to a single tag only one
+item carried (`qLDPC`) and re-syncing reported `0 new, 1 updated` — genuinely narrowed
+from 4 to 1. The other 3 previously-known items still got `3 highlights refreshed` in
+that same run, which is correct, not a leak: an item outside the current filter is left
+alone (not deleted, not newly created/rewritten), and the highlights-refresh pass
+intentionally covers every previously-synced item regardless of the active filter.
+
+Phase 5 is done. Not yet exercised: a filter selecting collections/tags that overlap
+only partially (some shared items, some exclusive to one side) — everything tested so
+far was either "everything matches" or "exactly one item matches."

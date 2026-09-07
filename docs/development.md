@@ -106,6 +106,14 @@ needs:
    | name | Zotero Integration |
    | setting | Zotero API key |
    | setting | Zotero sync filter |
+   | setting | Zotero citation style |
+   | setting | Zotero citation format |
+
+   The last two are parity pass C's (see the end of this file), both optional: a CSL
+   style id for every citation/bibliography Zotero renders (`apa`, `ieee`,
+   `chicago-note-bibliography` — blank means the last), and the citation picker's
+   default output format (`formatted`, `bibliography`, `pandoc`, `latex`, `biblatex` —
+   blank means `formatted`).
 
    The second setting row is Phase 5's collections/tags filter (`Zotero: Configure
    sync`), left blank by default (blank = sync the whole library). Add the row even if
@@ -446,3 +454,28 @@ Two things only a live click can settle: whether Amplenote keeps a non-http
 be sanitized — if so, fall back to printing the bare URL), and whether `pageIndex + 1`
 lands on the right page. Check with the qLDPC highlight: its page label is 1, so the
 link should open the PDF on page 1.
+
+### Pass C: citation style, formats, cite keys — implemented, not yet live-checked
+
+The reference plugin's `Format` set — formatted citation, formatted bibliography,
+pandoc `[@key]`, LaTeX `\cite{key}`, BibLaTeX `\autocite{key}` — minus its free-form
+template. Two new optional settings (table above): the CSL **style** Zotero renders
+with (passed as `style=` to every citation/bib request, the picker's and sync's alike),
+and the picker's **default format**. The citation picker's results prompt gained a second
+`select`, "Format", so the format can be changed per pick; its options are ordered with
+the setting's default first, because whether a `select` can be pre-selected by value is
+unconfirmed, and a select that returns nothing falls back to the setting.
+
+**Cite keys** (`src/cite-key.js`): the reference plugin gets them from Better BibTeX,
+which has no equivalent here. Zotero 7's native Citation Key field (`citationKey`) is
+used whenever it's set; when blank — it usually is — the fallback is
+`<first author's last name><year>` (`kahneman2011`; accents and punctuation stripped),
+then `<first title word><year>`, then the Zotero item key so it's never empty. A user
+who needs BibTeX-exact keys fills in Zotero's Citation Key field and the fallback steps
+aside. Not attempting to reproduce BBT's configurable key formulas.
+
+Live check: set `Zotero citation style` to `apa`, run `Zotero: Search citation` — the
+inserted text should be APA-shaped; pick "Pandoc" in the Format select — you should get
+`[@<author><year>]`. A bad style id should produce the hint about the setting, not a
+bare "HTTP 400". Also worth confirming the two-`select` prompt returns
+`[referenceKey, format]` positionally, as the string+select spike did.

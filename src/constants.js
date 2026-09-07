@@ -14,6 +14,14 @@ export const SETTING_ZOTERO_SYNC_FILTER = "Zotero sync filter";
 // with this style returns both fields populated.
 export const DEFAULT_CITATION_STYLE = "chicago-note-bibliography";
 
+// Parity pass C (docs/development.md). Both optional `setting | <label>` rows:
+//  - citation style: any CSL style id Zotero's `style=` param accepts (apa, ieee,
+//    chicago-note-bibliography, ...). Blank = DEFAULT_CITATION_STYLE.
+//  - citation format: the DEFAULT offered by the citation picker; see cite-key.js's
+//    CITATION_FORMATS for the accepted values. Blank = "formatted".
+export const SETTING_ZOTERO_CITATION_STYLE = "Zotero citation style";
+export const SETTING_ZOTERO_CITATION_FORMAT = "Zotero citation format";
+
 // Phase 3 sync bookkeeping (key -> noteUUID map, library version watermark) lives in a
 // fenced code block under this heading, in a note with this name. api-notes.md #4: machine
 // data belongs in a fence, never bare paragraph text. #4b: a heading is only as unique as

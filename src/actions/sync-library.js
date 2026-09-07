@@ -1,6 +1,8 @@
 import {
   SETTING_ZOTERO_API_KEY,
   SETTING_ZOTERO_SYNC_FILTER,
+  SETTING_ZOTERO_CITATION_STYLE,
+  DEFAULT_CITATION_STYLE,
   REFERENCE_HEADING,
   ZOTERO_NOTES_HEADING,
   HIGHLIGHTS_HEADING,
@@ -35,9 +37,9 @@ function zoteroOpenLink(a) {
  * `client.syncItems` (unfiltered — this plugin's original behavior) when nothing is
  * selected.
  */
-async function fetchSyncItems(client, filter, sinceVersion) {
+async function fetchSyncItems(client, filter, sinceVersion, style) {
   if (!filter.collections.length && !filter.tags.length && !filter.categories.length) {
-    return client.syncItems({ sinceVersion });
+    return client.syncItems({ sinceVersion, style });
   }
 
   let collectionKeys = [];
@@ -54,7 +56,7 @@ async function fetchSyncItems(client, filter, sinceVersion) {
     itemTypes = all.filter((c) => wanted.includes(c.name.toLowerCase())).map((c) => c.itemType);
   }
 
-  return client.syncFilteredItems({ sinceVersion, collectionKeys, tagNames: filter.tags, itemTypes });
+  return client.syncFilteredItems({ sinceVersion, collectionKeys, tagNames: filter.tags, itemTypes, style });
 }
 
 function renderAnnotation(a) {
@@ -210,9 +212,11 @@ export async function syncLibrary(app) {
   const filterChanged = state.filterSignature !== undefined && state.filterSignature !== signature;
   const sinceVersion = filterChanged ? undefined : state.libraryVersion ?? undefined;
 
+  const style = (app.settings[SETTING_ZOTERO_CITATION_STYLE] || "").trim() || DEFAULT_CITATION_STYLE;
+
   let result;
   try {
-    result = await fetchSyncItems(client, filter, sinceVersion);
+    result = await fetchSyncItems(client, filter, sinceVersion, style);
   } catch (e) {
     await app.alert(describeZoteroError(e));
     return;

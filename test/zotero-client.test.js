@@ -250,6 +250,9 @@ describe("createZoteroClient#searchItems", () => {
         title: "Thinking, Fast and Slow",
         citation: "Kahneman, Thinking, Fast and Slow.",
         bib: "Kahneman. Thinking, Fast and Slow. 2011.",
+        citationKey: "",
+        creators: [],
+        date: "",
       },
     ]);
   });

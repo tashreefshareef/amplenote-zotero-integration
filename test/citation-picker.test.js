@@ -104,17 +104,80 @@ describe("pickCitation", () => {
 
     const result = await pickCitation(app);
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       key: "ABCD1234",
       title: "Thinking, Fast and Slow",
       citation: "Kahneman, Thinking, Fast and Slow.",
       bib: "Kahneman. 2011.",
+      format: "formatted",
+      text: "Kahneman, Thinking, Fast and Slow.",
     });
     const selectPrompt = app._calls.prompts[1];
     expect(selectPrompt.options.inputs[0].type).toBe("select");
+    // Second select: output format, default first.
+    expect(selectPrompt.options.inputs[1].type).toBe("select");
+    expect(selectPrompt.options.inputs[1].options[0].value).toBe("formatted");
+    expect(selectPrompt.options.inputs[1].options.map((o) => o.value)).toEqual([
+      "formatted",
+      "bibliography",
+      "pandoc",
+      "latex",
+      "biblatex",
+    ]);
     expect(selectPrompt.options.inputs[0].options).toEqual([
       { label: "Kahneman, Thinking, Fast and Slow.", value: "ABCD1234" },
     ]);
+  });
+});
+
+describe("pickCitation — style and format settings", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test("sends the configured citation style and honors a per-pick format choice", async () => {
+    const app = createMockApp({
+      settings: { "Zotero API key": "k", "Zotero citation style": "apa", "Zotero citation format": "pandoc" },
+      promptQueue: ["kahneman", ["ABCD1234", "latex"]],
+    });
+    const fetchImpl = mockFetchSequence(
+      fakeResponse({ body: { userID: 1 } }),
+      fakeResponse({
+        body: [{ ...KAHNEMAN, data: { title: "Thinking, Fast and Slow", creators: [{ lastName: "Kahneman" }], date: "2011" } }],
+      })
+    );
+
+    const result = await pickCitation(app);
+
+    expect(new URL(fetchImpl.mock.calls[1][0].toString()).searchParams.get("style")).toBe("apa");
+    expect(app._calls.prompts[1].options.inputs[1].options[0].value).toBe("pandoc"); // setting's default first
+    expect(result.format).toBe("latex");
+    expect(result.text).toBe("\\cite{kahneman2011}");
+  });
+
+  test("falls back to the setting's default format when the format select returns nothing", async () => {
+    const app = createMockApp({
+      settings: { "Zotero API key": "k", "Zotero citation format": "bibliography" },
+      promptQueue: ["kahneman", ["ABCD1234", undefined]],
+    });
+    mockFetchSequence(fakeResponse({ body: { userID: 1 } }), fakeResponse({ body: [KAHNEMAN] }));
+
+    const result = await pickCitation(app);
+
+    expect(result.format).toBe("bibliography");
+    expect(result.text).toBe("Kahneman. 2011.");
+  });
+
+  test("hints at the style setting when Zotero rejects the request with a non-default style", async () => {
+    const app = createMockApp({
+      settings: { "Zotero API key": "k", "Zotero citation style": "not-a-style" },
+      promptQueue: ["kahneman"],
+    });
+    mockFetchSequence(fakeResponse({ body: { userID: 1 } }), fakeResponse({ status: 400 }));
+
+    await pickCitation(app);
+
+    expect(app._calls.alerts[0]).toMatch(/Is "not-a-style" a valid Zotero style id/);
   });
 });
 

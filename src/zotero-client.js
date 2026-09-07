@@ -208,6 +208,11 @@ export function createZoteroClient({
       title: item.data?.title || "(untitled)",
       citation: stripHtmlToText(item.citation),
       bib: stripHtmlToText(item.bib),
+      // For cite-key formats (cite-key.js): Zotero 7's native Citation Key field, and
+      // what the fallback key is derived from when it's blank.
+      citationKey: item.data?.citationKey || "",
+      creators: item.data?.creators || [],
+      date: item.data?.date || "",
     }));
   }
 
@@ -225,10 +230,10 @@ export function createZoteroClient({
    * drops the deletion tail. A note whose Zotero item was deleted just stops being
    * touched by future syncs.
    */
-  async function syncItems({ sinceVersion, pageSize = 50 } = {}) {
+  async function syncItems({ sinceVersion, style = DEFAULT_CITATION_STYLE, pageSize = 50 } = {}) {
     const uid = await resolveUserID();
     const { items, lastModifiedVersion } = await paginate(`/users/${uid}/items/top`, {
-      params: { itemType: "-attachment", include: "data,citation,bib" },
+      params: { itemType: "-attachment", include: "data,citation,bib", style },
       sinceVersion,
       pageSize,
     });
@@ -289,10 +294,11 @@ export function createZoteroClient({
     collectionKeys = [],
     tagNames = [],
     itemTypes = [],
+    style = DEFAULT_CITATION_STYLE,
     pageSize = 50,
   } = {}) {
     const uid = await resolveUserID();
-    const baseParams = { itemType: "-attachment", include: "data,citation,bib" };
+    const baseParams = { itemType: "-attachment", include: "data,citation,bib", style };
 
     const byKey = new Map();
     let lastModifiedVersion = null;
@@ -311,7 +317,7 @@ export function createZoteroClient({
       await mergeIn(`/users/${uid}/items/top`, { ...baseParams, tag: tagNames.join(" || ") });
     }
     if (itemTypes.length) {
-      await mergeIn(`/users/${uid}/items/top`, { include: "data,citation,bib", itemType: itemTypes.join(" || ") });
+      await mergeIn(`/users/${uid}/items/top`, { include: "data,citation,bib", style, itemType: itemTypes.join(" || ") });
     }
 
     return { lastModifiedVersion, items: [...byKey.values()].map(mapSyncItem) };

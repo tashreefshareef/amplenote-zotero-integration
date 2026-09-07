@@ -366,8 +366,14 @@ that same run, which is correct, not a leak: an item outside the current filter 
 alone (not deleted, not newly created/rewritten), and the highlights-refresh pass
 intentionally covers every previously-synced item regardless of the active filter.
 
-Phase 5 is done, including categories. Not yet exercised live: the categories dimension
-specifically (added after the collections/tags live test above, covered only by Jest
-against the mock so far), and a filter selecting collections/tags/categories that overlap
-only partially (some shared items, some exclusive to one side) — everything tested live
-so far was either "everything matches" or "exactly one item matches."
+**Categories confirmed live too.** The picker rendered all ~35 Zotero item types cleanly
+(scrollable, no rendering issues at that list length). Filtering to `Category: Journal
+Article` alone reported `0 new, 1 updated` — narrowed from 4 to 1 — and the exclusion was
+verified for the right reason, not just a plausible-looking number: the qLDPC paper's own
+`Item Type` in Zotero is `Preprint`, a different category from `Journal Article`, checked
+directly against the source rather than assumed.
+
+Phase 5 is done, all three axes (collections, tags, categories) live-verified. Not yet
+exercised: a filter selecting criteria that overlap only partially (some shared items,
+some exclusive to one side) — everything tested live so far was either "everything
+matches" or "exactly one item matches."

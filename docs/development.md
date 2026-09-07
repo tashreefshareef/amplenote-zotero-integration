@@ -377,3 +377,52 @@ Phase 5 is done, all three axes (collections, tags, categories) live-verified. N
 exercised: a filter selecting criteria that overlap only partially (some shared items,
 some exclusive to one side) — everything tested live so far was either "everything
 matches" or "exactly one item matches."
+
+## Parity pass against the Obsidian reference plugin
+
+The bounty asks for parity "or as close as possible" with
+[obsidian-zotero-integration](https://github.com/community-archive/obsidian-zotero-integration).
+Audited against what that plugin actually does — its `docs/` (Templating, Export
+Settings, PDF Annotations, FAQ), its command registrations in `src/main.ts`, and its
+format types — not its README, which is thin. Two findings reframed earlier worries:
+
+- **It has no automatic sync either.** Every import there is a manual command. Manual
+  `Sync now` is at parity; the bounty's "automatically" exceeds the plugin it cites.
+- **It doesn't import PDF files either.** It links out (`zotero://open-pdf`) and extracts
+  annotations. Our deep link is the same outcome.
+
+What it has that this plugin didn't, and what was done about each:
+
+| Feature | Status |
+|---|---|
+| User edits survive re-import (`{% persist %}`) | **Done (pass A)** — see below |
+| Zotero's own notes (child `note` items) imported | **Done (pass A)** |
+| Highlight color label (`colorCategory`) | Pass B |
+| `zotero://open-pdf/...?page=N` link per highlight | Pass B |
+| Choice of CSL citation style; bibliography insert; pandoc/LaTeX cite keys | Pass C |
+| Nunjucks templating, Data explorer | Not doing — a template engine in a plugin code block hits the tokenization wall (`api-notes.md` #1) |
+| Image extraction (rectangle annotations → files) | Impossible — needs the PDF's bytes (`zotero-findings.md`) |
+| Zotero's native CAYW picker | Parity by outcome via `app.prompt`; theirs needs desktop Zotero running |
+
+Beyond parity here: whole-library / collection / tag / category sync, Zotero tags →
+Amplenote tags, and it works on web/mobile with no desktop Zotero.
+
+### Pass A: sectioned item notes — implemented, not yet live-checked
+
+Every synced item note now has four sections, in order: `## Reference` (bibliography,
+abstract, links), `## Zotero Notes` (the item's own child notes, paragraph structure
+kept), `## Highlights & Notes` (annotations), `## My Notes`. **Sync only ever rewrites
+the first three, each as a section-scoped write** — My Notes, and anything else the user
+adds anywhere in the note (their own headings included), survives every re-sync. That is
+the reference plugin's `persist` by outcome, and it closes a real data-loss hazard: until
+now an item-level change rewrote the whole note, wiping anything typed into it.
+
+A note written before this layout (no `## Reference` heading) is migrated once by a
+whole-note rewrite — the same write it used to get every time — and is section-safe from
+then on. The highlights-refresh pass now also refreshes Zotero Notes (a child note added
+without any other edit is invisible to `since=` for the same reason a highlight is), but
+only on sectioned notes, so a legacy note doesn't get a section appended out of order.
+
+Live check: sync, type something under My Notes and add a heading of your own, change
+the item in Zotero, sync again — your text must still be there and the Reference section
+updated. Your 4 existing notes will migrate on their next item-level change.

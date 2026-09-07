@@ -415,7 +415,7 @@ describe("createZoteroClient#getItemExtras", () => {
 
     const extras = await client.getItemExtras("ITEM1");
 
-    expect(extras).toEqual({ attachments: [], annotations: [] });
+    expect(extras).toEqual({ attachments: [], annotations: [], notes: [] });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 });

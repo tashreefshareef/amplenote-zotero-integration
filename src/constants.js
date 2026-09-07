@@ -21,7 +21,11 @@ export const DEFAULT_CITATION_STYLE = "chicago-note-bibliography";
 export const SYNC_NOTE_NAME = "Zotero Sync";
 export const SYNC_STATE_HEADING = "Zotero Sync State";
 
-// Phase 4: the per-item-note section holding imported Zotero annotations (highlights,
-// sticky notes). Present in every item note from creation so a later annotation-only
-// refresh (sync-library.js) always has a section to target.
+// The four sections of every synced item note, in order. Every write after creation is
+// section-scoped (note-sections.js) so a re-sync never touches anything the user added —
+// the Obsidian reference plugin's `{% persist %}` equivalent. Sync rewrites the first
+// three; MY_NOTES is created once and never written again.
+export const REFERENCE_HEADING = "Reference";
+export const ZOTERO_NOTES_HEADING = "Zotero Notes";
 export const HIGHLIGHTS_HEADING = "Highlights & Notes";
+export const MY_NOTES_HEADING = "My Notes";

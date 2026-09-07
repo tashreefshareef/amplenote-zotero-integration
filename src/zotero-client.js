@@ -16,7 +16,7 @@
  *     doing later ("how you get banned mid-demo").
  */
 import { ZOTERO_API_BASE, ZOTERO_API_VERSION, DEFAULT_CITATION_STYLE } from "./constants.js";
-import { stripHtmlToText } from "./format-citation.js";
+import { stripHtmlToText, htmlToParagraphText } from "./format-citation.js";
 
 /** Shared by syncItems and syncFilteredItems — same envelope, same fields sync needs. */
 function mapSyncItem(item) {
@@ -359,6 +359,13 @@ export function createZoteroClient({
     }
     annotations.sort((x, y) => x.sortIndex.localeCompare(y.sortIndex));
 
+    // Zotero's own notes on the item (child `note` items, HTML bodies) — what the
+    // Obsidian reference plugin's "Import notes" pulls in. Kept paragraph-structured.
+    const notes = children
+      .filter((c) => c.data?.itemType === "note")
+      .map((n) => ({ key: n.key, text: htmlToParagraphText(n.data.note || "") }))
+      .filter((n) => n.text);
+
     return {
       attachments: attachments.map((a) => ({
         key: a.key,
@@ -366,6 +373,7 @@ export function createZoteroClient({
         url: a.links?.alternate?.href || null,
       })),
       annotations,
+      notes,
     };
   }
 

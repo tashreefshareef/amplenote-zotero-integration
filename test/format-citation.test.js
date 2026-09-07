@@ -1,4 +1,4 @@
-import { stripHtmlToText, truncateForLabel } from "../src/format-citation.js";
+import { stripHtmlToText, truncateForLabel, htmlToParagraphText } from "../src/format-citation.js";
 
 describe("stripHtmlToText", () => {
   test("strips a real Zotero citation span", () => {
@@ -59,5 +59,21 @@ describe("truncateForLabel", () => {
     expect(truncateForLabel(null)).toBe("");
     expect(truncateForLabel(undefined)).toBe("");
     expect(truncateForLabel("")).toBe("");
+  });
+});
+
+describe("htmlToParagraphText", () => {
+  test("turns block closers and <br> into line breaks, keeping paragraphs apart", () => {
+    const html = '<div data-schema-version="9"><p>Comment: 56 + 12 pages</p><p>Line one<br>Line two</p></div>';
+    expect(htmlToParagraphText(html)).toBe("Comment: 56 + 12 pages\nLine one\nLine two");
+  });
+
+  test("decodes entities and collapses whitespace within a line only", () => {
+    expect(htmlToParagraphText("<p>A &amp;   B</p><p>  C  </p>")).toBe("A & B\nC");
+  });
+
+  test("drops empty paragraphs and returns empty string for empty input", () => {
+    expect(htmlToParagraphText("<p></p><p> </p>")).toBe("");
+    expect(htmlToParagraphText(null)).toBe("");
   });
 });

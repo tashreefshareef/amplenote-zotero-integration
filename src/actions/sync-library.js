@@ -1,7 +1,14 @@
-import { SETTING_ZOTERO_API_KEY, SETTING_ZOTERO_SYNC_FILTER, HIGHLIGHTS_HEADING } from "../constants.js";
+import {
+  SETTING_ZOTERO_API_KEY,
+  SETTING_ZOTERO_SYNC_FILTER,
+  REFERENCE_HEADING,
+  ZOTERO_NOTES_HEADING,
+  HIGHLIGHTS_HEADING,
+  MY_NOTES_HEADING,
+} from "../constants.js";
 import { createZoteroClient, describeZoteroError } from "../zotero-client.js";
 import { loadSyncState, saveSyncState } from "../sync-state.js";
-import { writeSection } from "../note-sections.js";
+import { writeSection, countHeadingOccurrences } from "../note-sections.js";
 import { parseFilterSetting, filterSignature } from "../sync-filter.js";
 
 /**
@@ -50,24 +57,55 @@ function renderAnnotations(annotations) {
   return annotations.map(renderAnnotation).join("\n");
 }
 
-function renderItemNote(item, extras) {
+function renderReference(item, extras) {
   const lines = [item.bib || item.citation || item.title];
   if (item.abstract) lines.push("", item.abstract);
   if (item.url) lines.push("", `[View in Zotero](${item.url})`);
   for (const att of extras.attachments) {
     if (att.url) lines.push("", `[View "${att.title}" in Zotero](${att.url})`);
   }
-  lines.push("", `## ${HIGHLIGHTS_HEADING}`, "", renderAnnotations(extras.annotations).trim());
   return lines.join("\n") + "\n";
 }
 
-/** Falls back to an empty attachments/annotations set rather than failing the whole
- * item's bibliographic sync over an annotation-fetch problem. */
+function renderZoteroNotes(notes) {
+  if (!notes.length) return "_No Zotero notes._\n";
+  return notes.map((n) => n.text).join("\n\n") + "\n";
+}
+
+const MY_NOTES_PLACEHOLDER = "_Anything you write in this section is yours — sync never touches it._\n";
+
+/** The full note, used only at creation (and for a one-time migration of a note that
+ * predates the sectioned layout). Every later write is per-section. */
+function renderItemNote(item, extras) {
+  return [
+    `## ${REFERENCE_HEADING}`,
+    "",
+    renderReference(item, extras).trim(),
+    "",
+    `## ${ZOTERO_NOTES_HEADING}`,
+    "",
+    renderZoteroNotes(extras.notes).trim(),
+    "",
+    `## ${HIGHLIGHTS_HEADING}`,
+    "",
+    renderAnnotations(extras.annotations).trim(),
+    "",
+    `## ${MY_NOTES_HEADING}`,
+    "",
+    MY_NOTES_PLACEHOLDER.trim(),
+    "",
+  ].join("\n");
+}
+
+const EMPTY_EXTRAS = { attachments: [], annotations: [], notes: [] };
+
+/** Falls back to an empty attachments/annotations/notes set rather than failing the
+ * whole item's bibliographic sync over a children-fetch problem. */
 async function getExtrasOrEmpty(client, key) {
   try {
     return await client.getItemExtras(key);
   } catch {
-    return { attachments: [], annotations: [] };
+    return EMPTY_EXTRAS;
   }
 }
 
@@ -90,28 +128,39 @@ async function resolveNoteUUID(app, entry, title) {
   return byName.uuid;
 }
 
+/** A note written before the sectioned layout has no `## Reference` heading. */
+async function isSectioned(app, uuid) {
+  const content = await app.getNoteContent({ uuid });
+  return Boolean(content) && countHeadingOccurrences(content, REFERENCE_HEADING) > 0;
+}
+
+const sectionOpts = (label) => ({ headingLevel: "##", noteLabel: label });
+
 /**
  * "Zotero: Sync now" (Phase 3 content sync + Phase 4 annotation import, roadmap.md).
  * Manual trigger rather than automatic/background — Amplenote plugins have no
- * background execution to run this on.
+ * background execution to run this on (and the Obsidian reference plugin is manual too).
  *
  * Each Zotero item becomes its own Amplenote note (so Zotero tags can map onto Amplenote
- * tags, which are per-note, not per-line). A previously-synced item is matched by key
- * against the map in the "Zotero Sync" note (sync-state.js) and its note's content is
- * replaced wholesale; a new item creates a note and is added to the map. Re-synced items
- * do NOT get their tags refreshed — there is no confirmed Amplenote API to retag an
- * existing note, only to set tags at `createNote` time.
+ * tags, which are per-note, not per-line), laid out in four sections: Reference
+ * (bibliography, abstract, links), Zotero Notes (the item's own child notes), Highlights
+ * & Notes (PDF annotations), and My Notes. **Sync only ever rewrites the first three,
+ * each as a section-scoped write** — anything the user adds anywhere else in the note,
+ * My Notes included, survives every re-sync. That's the Obsidian reference plugin's
+ * `{% persist %}` by outcome, and it closes a real data-loss hazard the earlier
+ * whole-note rewrite had. A note created before this layout (no `## Reference` heading)
+ * is migrated once by whole-note rewrite — the same write it used to get every time.
  *
- * Annotations (highlights, sticky notes) live in a `## Highlights & Notes` section.
+ * A previously-synced item is matched by key against the map in the "Zotero Sync" note
+ * (sync-state.js). Re-synced items do NOT get their tags refreshed — there is no
+ * confirmed Amplenote API to retag an existing note, only `createNote`'s tags argument.
+ *
  * Zotero's item-level `since=` only reports a CHANGE TO THE ITEM ITSELF, not to a
- * highlight added under one of its attachments two levels down — so a highlight-only
- * edit wouldn't be seen at all if this only touched items `since=` returned. Instead,
- * every OTHER previously-synced item (not touched by this run's bib-level sync) also
- * gets its Highlights section refreshed. This is a full annotation re-check over every
- * known item, every manual sync — not incremental — which is the deliberate trade made
- * here: it costs roughly one extra Zotero request per already-synced item on every run,
- * acceptable for a user-initiated action, in exchange for actually catching a highlight
- * added without any other edit to that item (the actual point of importing highlights).
+ * highlight or child note added under it — so every OTHER previously-synced item (not
+ * touched by this run's item-level sync) also gets its Zotero Notes and Highlights
+ * sections refreshed, every run. Not incremental, by design: roughly one extra Zotero
+ * request per already-synced item per manual sync, in exchange for actually catching a
+ * highlight or note added without any other edit to the item.
  */
 export async function syncLibrary(app) {
   const apiKey = (app.settings[SETTING_ZOTERO_API_KEY] || "").trim();
@@ -159,19 +208,25 @@ export async function syncLibrary(app) {
     // this action alerts a clear message instead of throwing uncaught.
     try {
       const extras = await getExtrasOrEmpty(client, item.key);
-      const content = renderItemNote(item, extras);
 
       if (existing) {
         const uuid = await resolveNoteUUID(app, existing, item.title);
         if (!uuid) {
           throw new Error(`note ${existing.noteUUID} no longer exists, and no note named "${item.title}" was found to recover it`);
         }
-        await app.replaceNoteContent({ uuid }, content);
+        if (await isSectioned(app, uuid)) {
+          const label = `"${item.title}"`;
+          await writeSection(app, uuid, REFERENCE_HEADING, renderReference(item, extras), sectionOpts(label));
+          await writeSection(app, uuid, ZOTERO_NOTES_HEADING, renderZoteroNotes(extras.notes), sectionOpts(label));
+          await writeSection(app, uuid, HIGHLIGHTS_HEADING, renderAnnotations(extras.annotations), sectionOpts(label));
+        } else {
+          await app.replaceNoteContent({ uuid }, renderItemNote(item, extras));
+        }
         existing.title = item.title;
         updated++;
       } else {
         const uuid = await app.createNote(item.title, item.tags);
-        await app.insertNoteContent({ uuid }, content, { atEnd: true });
+        await app.insertNoteContent({ uuid }, renderItemNote(item, extras), { atEnd: true });
         state.items[item.key] = { noteUUID: uuid, title: item.title };
         created++;
       }
@@ -202,10 +257,13 @@ export async function syncLibrary(app) {
         throw new Error(`note ${entry.noteUUID} no longer exists${named}`);
       }
       const extras = await client.getItemExtras(key);
-      await writeSection(app, uuid, HIGHLIGHTS_HEADING, renderAnnotations(extras.annotations), {
-        headingLevel: "##",
-        noteLabel: `The note for Zotero item ${key}`,
-      });
+      const label = `The note for Zotero item ${key}`;
+      // Zotero Notes only exists on the sectioned layout; a legacy note gets the full
+      // layout on its next item-level update rather than a section appended out of order.
+      if (await isSectioned(app, uuid)) {
+        await writeSection(app, uuid, ZOTERO_NOTES_HEADING, renderZoteroNotes(extras.notes), sectionOpts(label));
+      }
+      await writeSection(app, uuid, HIGHLIGHTS_HEADING, renderAnnotations(extras.annotations), sectionOpts(label));
       highlightsRefreshed++;
     } catch (e) {
       failures.push(`highlights for ${key} (${e.message})`);

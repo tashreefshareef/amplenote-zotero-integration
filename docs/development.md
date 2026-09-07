@@ -503,5 +503,9 @@ hint checked for HTTP 400, but Zotero answers an unloadable style with **HTTP 50
 generic message fired instead and told the user to check their API key, which was fine.
 `describeZoteroError` now takes the style in use and branches per status: 403 blames the
 key, a 5xx with a non-default style names the style, other 5xx blames Zotero's server.
-Sync passes its style through too, since a bad style breaks sync the same way. Still
-worth re-checking live that a bogus style now names itself.
+Sync passes its style through too, since a bad style breaks sync the same way.
+**Re-checked live, 2026-09-07:** a bogus style now produces *"Zotero couldn't render the
+citation (HTTP 500). Is 'not-a-style' a valid Zotero style id? That's what this status
+usually means."* — no mention of the API key.
+
+**Pass C is live-verified, and with it all three parity passes.**

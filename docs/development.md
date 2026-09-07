@@ -218,7 +218,7 @@ designed fallback, not a bug):
   aborted the whole sync silently. Fixed — failures are now isolated per item and
   reported in the final alert alongside the new/updated counts.
 
-## Phase 4: attachments and annotations — in progress, one live bug found and fixed
+## Phase 4: attachments and annotations — live-verified, 2026-09-07
 
 **A live run of the highlights-refresh pass failed on all 4 previously-synced items**,
 each with `Cannot read properties of null (reading 'split')`. Root cause chased to
@@ -254,9 +254,27 @@ durable" was too strong a claim; what's actually confirmed is narrower (one
 `resolveNoteUUID` fallback stays as cheap insurance regardless, having correctly been a
 no-op here.
 
-Still untested: the actual annotation-content path (a highlight/note actually rendering
-correctly from a real annotated PDF) — every check so far has exercised the write
-mechanism, not confirmed real Zotero annotation data renders right.
+The uuid-resolution failure turned out to be **intermittent, not one-time**: a repeat
+run on the same 4 items later failed again with "no longer exists," even though they'd
+resolved fine minutes before. Root cause of THAT: these 4 items predate title tracking,
+so `resolveNoteUUID` had no name to fall back on when the uuid check failed — the
+self-heal path existed but had nothing to work with. Fixed with `client.getItem(key)`,
+which backfills a missing title straight from Zotero (the one identifier that's always
+reliable) before attempting recovery. Re-run after that fix: **all 4 items recovered
+with zero failures.**
+
+**Annotation content confirmed live, 2026-09-07**, against a real highlighted PDF: the
+item note showed its bibliography, abstract, "View in Zotero" link, and — under
+`## Highlights & Notes` — the highlighted text as a blockquote with the correct page
+number. One real formatting bug found here: a comment on that highlight rendered as an
+unrelated-looking floating paragraph right after the quote, nothing tying the two
+together but adjacency. Fixed by labeling it `_Comment: ..._` explicitly rather than
+relying on position to imply the connection.
+
+Phase 4 is done. What's still unconfirmed, lower priority: `image`/`ink` annotation
+types (named-but-not-rendered placeholder path never exercised against a real one), and
+an item with more than one attachment or more than a handful of annotations (ordering
+and volume at scale untested).
 
 Folded into the same `Zotero: Sync now` action rather than a separate one, since it
 writes into the same per-item note. Each item note now also gets:

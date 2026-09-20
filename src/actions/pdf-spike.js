@@ -104,10 +104,31 @@ export async function spikeEmbedCall(app, value) {
   return JSON.stringify({ apiKey, uid, base: ZOTERO_API_BASE });
 }
 
+
 /**
- * The embed. Runs the three probes IN the embed's own origin, which is the only place
- * the CSP question (B) can be answered. Everything is reported on screen — nothing here
- * writes to a note.
+ * The embed — ROUND 2. Round 1 settled two of three questions:
+ *   A ✅ `/file/view/url` returns a presigned url (HTTP 200) — and it points at
+ *        **files.zotero.net**, NOT the `zoterofilestorage.s3.amazonaws.com` host Phase 0
+ *        tested. A different server, reachable only through this endpoint.
+ *   C ❌ `cors-proxy` returns 400 even for the fully-resolved url. Combined with it
+ *        400ing on unrelated hosts from curl, Amplenote's proxy is restricted to
+ *        Amplenote's own attachment domain. The PDF.js-via-proxy route is dead.
+ *   B ⚠️ the iframe's onload FIRED but Edge painted "This page has been blocked by
+ *        Microsoft Edge". files.zotero.net sends no X-Frame-Options, so framing isn't
+ *        refused by Zotero — the likely cause is the file being served as a DOWNLOAD
+ *        (Content-Disposition: attachment) inside a sandboxed iframe that lacks
+ *        allow-downloads.
+ *
+ * So round 2 asks the question that follows from A's new host, which Phase 0 never had
+ * the chance to ask (it only knew the S3 host): **is files.zotero.net CORS-open?** If it
+ * is, the bytes can be read directly, turned into a `blob:` url, and framed — blob is
+ * same-origin to the embed, which sidesteps BOTH the download block and CORS. That would
+ * give seamless viewing AND make PDF.js viable without Amplenote's proxy at all.
+ *
+ * Fallbacks tried in the same pass: <embed> and <object>, which some browsers treat as a
+ * plugin-render rather than a navigation, so they may escape the download block.
+ * The full url is printed, selectable, so it can be opened in a plain tab — if it
+ * downloads there instead of rendering, that confirms the attachment disposition.
  */
 export function renderPdfSpike(app, args) {
   const params = new URLSearchParams(args || "");
@@ -115,74 +136,72 @@ export function renderPdfSpike(app, args) {
   return `<!doctype html>
 <meta charset="utf-8">
 <style>
-  body { font: 13px/1.5 system-ui, sans-serif; margin: 8px; color: #222; }
+  body { font: 13px/1.5 system-ui, sans-serif; margin: 8px; color: #222; background: #fff; }
   h2 { font-size: 14px; margin: 0 0 6px; }
   .row { margin: 4px 0; padding: 4px 6px; border-left: 3px solid #ccc; background: #f7f7f7; }
   .ok { border-color: #2e7d32; } .bad { border-color: #c62828; } .wait { border-color: #999; }
-  code { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
-  iframe { width: 100%; height: 420px; border: 1px solid #bbb; margin-top: 8px; }
+  textarea { width: 100%; height: 44px; font: 11px ui-monospace, monospace; }
+  .box { width: 100%; height: 320px; border: 1px solid #bbb; margin-top: 6px; }
 </style>
-<h2>Zotero PDF viewer spike</h2>
+<h2>Zotero PDF viewer spike — round 2</h2>
 <div id="out"></div>
-<div id="frame"></div>
+<div id="stage"></div>
 <script>
 (function () {
-  var out = document.getElementById("out");
-  function say(id, cls, text) {
+  var out = document.getElementById("out"), stage = document.getElementById("stage");
+  function say(id, cls, html) {
     var el = document.getElementById(id);
     if (!el) { el = document.createElement("div"); el.id = id; out.appendChild(el); }
-    el.className = "row " + cls;
-    el.innerHTML = text;
+    el.className = "row " + cls; el.innerHTML = html;
   }
+  function show(el) { el.className = "box"; stage.appendChild(el); }
+
   say("a", "wait", "A. Resolving presigned url…");
 
   function probe(cfg) {
-    var base = cfg.base, key = cfg.apiKey, uid = cfg.uid, att = ${JSON.stringify(att)};
-    var viewUrl = base + "/users/" + uid + "/items/" + att + "/file/view/url";
-
-    // A — does /file/view/url hand back a presigned url? api.zotero.org is CORS-open, so
-    // reading this STRING should work even though reading the file's bytes doesn't.
-    fetch(viewUrl, { headers: { "Zotero-API-Key": key, "Zotero-API-Version": "3" } })
-      .then(function (r) { return r.text().then(function (t) { return { status: r.status, text: t }; }); })
+    var url0 = cfg.base + "/users/" + cfg.uid + "/items/" + ${JSON.stringify(att)} + "/file/view/url";
+    fetch(url0, { headers: { "Zotero-API-Key": cfg.apiKey, "Zotero-API-Version": "3" } })
+      .then(function (r) { return r.text().then(function (t) { return { s: r.status, t: t }; }); })
       .then(function (res) {
-        if (res.status !== 200 || !/^https?:/.test(res.text.trim())) {
-          say("a", "bad", "A. FAILED — /file/view/url returned HTTP " + res.status +
-            ": <code>" + res.text.slice(0, 200) + "</code>");
-          return;
+        if (res.s !== 200 || !/^https?:/.test(res.t.trim())) {
+          say("a", "bad", "A. FAILED — HTTP " + res.s); return;
         }
-        var url = res.text.trim();
-        say("a", "ok", "A. OK — presigned url returned (HTTP 200):<br><code>" + url.slice(0, 160) + "…</code>");
+        var url = res.t.trim();
+        say("a", "ok", "A. OK — presigned url (select to copy, then try opening it in a normal tab):" +
+          '<textarea readonly onclick="this.select()">' + url + "</textarea>");
 
-        // B — iframe it. No CORS involved; this tests Amplenote's embed CSP frame-src.
-        say("b", "wait", "B. Trying &lt;iframe&gt; of that url — if a PDF appears below, viewing works.");
-        var f = document.createElement("iframe");
-        f.src = url;
-        f.onload = function () { say("b", "ok", "B. iframe fired onload — check below: is a PDF visible?"); };
-        f.onerror = function () { say("b", "bad", "B. iframe errored."); };
-        document.getElementById("frame").appendChild(f);
-        setTimeout(function () {
-          var el = document.getElementById("b");
-          if (el && /Trying/.test(el.textContent)) {
-            say("b", "bad", "B. iframe never loaded (likely CSP frame-src). Check the console for a CSP violation.");
-          }
-        }, 6000);
-
-        // C — proxy the RESOLVED url (Phase 0 only ever proxied the redirecting one).
-        say("c", "wait", "C. Trying cors-proxy on the RESOLVED url…");
-        var proxied = "https://plugins.amplenote.com/cors-proxy?apiurl=" + encodeURIComponent(url);
-        fetch(proxied)
+        // ---- THE decisive test: can we read the BYTES from files.zotero.net? ----
+        say("b", "wait", "B. fetch() on files.zotero.net — is it CORS-open?");
+        fetch(url)
+          .then(function (r) { return r.blob().then(function (b) { return { s: r.status, b: b, type: b.type }; }); })
           .then(function (r) {
-            return r.arrayBuffer().then(function (b) { return { status: r.status, bytes: b.byteLength }; });
-          })
-          .then(function (r) {
-            if (r.status === 200 && r.bytes > 1000) {
-              say("c", "ok", "C. OK — proxy returned " + r.bytes +
-                " bytes. PDF.js is viable, so the Annotator's viewer could be reused.");
-            } else {
-              say("c", "bad", "C. proxy returned HTTP " + r.status + ", " + r.bytes + " bytes.");
+            if (!r.b || r.b.size < 1000) {
+              say("b", "bad", "B. fetch returned HTTP " + r.s + " but only " + (r.b ? r.b.size : 0) + " bytes."); return;
             }
+            say("b", "ok", "B. ✅ CORS-OPEN — read " + r.b.size + " bytes (" + (r.type || "no type") +
+              "). Phase 0's 'cannot read Zotero bytes' does NOT hold for this host.");
+
+            // Bytes in hand -> blob url is same-origin, so no download block, no CORS.
+            var burl = URL.createObjectURL(r.b.type === "application/pdf" ? r.b : new Blob([r.b], { type: "application/pdf" }));
+            say("c", "wait", "C. Framing the blob: url — a PDF below means seamless viewing works.");
+            var f = document.createElement("iframe"); f.src = burl;
+            f.onload = function () { say("c", "ok", "C. blob iframe loaded — is a PDF visible below?"); };
+            show(f);
           })
-          .catch(function (e) { say("c", "bad", "C. proxy fetch threw: " + e.message); });
+          .catch(function (e) {
+            say("b", "bad", "B. ❌ fetch blocked: " + e.message +
+              " — so files.zotero.net is NOT CORS-open either, and the blob route is out.");
+
+            // No bytes. Try the tags that render rather than navigate.
+            say("d", "wait", "D. Trying &lt;embed&gt; and &lt;object&gt; on the direct url instead…");
+            var em = document.createElement("embed");
+            em.src = url; em.type = "application/pdf"; show(em);
+            var ob = document.createElement("object");
+            ob.data = url; ob.type = "application/pdf"; show(ob);
+            setTimeout(function () {
+              say("d", "wait", "D. &lt;embed&gt; and &lt;object&gt; are rendered below — does EITHER show a PDF?");
+            }, 2500);
+          });
       })
       .catch(function (e) { say("a", "bad", "A. fetch threw: " + e.message); });
   }

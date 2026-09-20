@@ -410,6 +410,7 @@ What it has that this plugin didn't, and what was done about each:
 | Choice of CSL citation style; bibliography insert; pandoc/LaTeX cite keys | Pass C |
 | Nunjucks templating, Data explorer | Not doing — a template engine in a plugin code block hits the tokenization wall (`api-notes.md` #1) |
 | Image extraction (rectangle annotations → files) | Impossible — needs the PDF's bytes (`zotero-findings.md`) |
+| In-note PDF viewing | Impossible — six routes tested and closed, `zotero-findings.md`. Deep link is the answer, same as theirs. |
 | Zotero's native CAYW picker | Parity by outcome via `app.prompt`; theirs needs desktop Zotero running |
 
 Beyond parity here: whole-library / collection / tag / category sync, Zotero tags →

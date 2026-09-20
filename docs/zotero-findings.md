@@ -198,6 +198,46 @@ trip each.
    floor in `docs/roadmap.md` — worth roughly the ¾ day the roadmap already flagged for
    this outcome.
 
+## ❌ A Zotero PDF cannot be VIEWED inside Amplenote either — six routes tested, 2026-09-20
+
+Phase 0 concluded the plugin can't read a Zotero attachment's **bytes**, and that was
+taken to mean in-note **viewing** was impossible too. That inference was wrong twice
+over — **CORS governs `fetch`/XHR, not `<iframe>`**, and viewing needs no text layer, so
+it doesn't need bytes at all. Re-opened and tested properly with a throwaway probe embed
+(now deleted, like Phase 0's). The conclusion survives, but it is now *measured* rather
+than inherited, and the tested surface is much wider:
+
+| Route | Result |
+|---|---|
+| `<iframe>` the presigned file url | ❌ `onload` fires, then **Edge paints its own block page**. Zotero sends **no `X-Frame-Options`**, so framing isn't refused by Zotero — the file is served as a download, and Amplenote's plugin iframe is sandboxed without `allow-downloads`. |
+| `fetch()` bytes from **`files.zotero.net`** | ❌ "Failed to fetch" — not CORS-open. |
+| `fetch()` bytes from `zoterofilestorage.s3…` | ❌ No CORS header (Phase 0). |
+| Amplenote's `cors-proxy`, **resolved** url | ❌ HTTP 400 — see below. |
+| `<embed>` / `<object type="application/pdf">` | ❌ Both render blank. |
+| `<iframe>` Zotero's own web reader | ❌ `www.zotero.org` sends **`X-Frame-Options: SAMEORIGIN`**. |
+
+Three things worth keeping, because each corrects something previously believed:
+
+1. **`/items/<key>/file/view/url` exists and works** (HTTP 200), returning a presigned url
+   as plain text. `api.zotero.org` is CORS-open, so the plugin *can* read that **string**
+   even though it can't read the **file**. Phase 0 never used this endpoint — it only
+   ever called `/items/<key>/file`, which 302s.
+2. **That url points at `files.zotero.net`, not S3.** A host Phase 0 never saw, so its
+   "no CORS on Zotero file storage" finding was, strictly, only ever measured against
+   `zoterofilestorage.s3.amazonaws.com`. Now measured on both. Same answer.
+3. **Amplenote's `cors-proxy` is restricted to Amplenote's own attachment domain.** Phase
+   0 called it 400 for a Zotero url; it also 400s for `httpbin.org` and every other host
+   tried from curl, so it rejects the *target*, not just Zotero. Don't reach for it as a
+   general-purpose proxy for a future plugin — it is not one.
+
+**What's left, and why it isn't taken:** a third-party CORS proxy would work, but it
+means routing a presigned url — and therefore the user's actual document — through a
+server neither we nor Amplenote control. Not acceptable for a research library.
+
+**So the deep link stands as the answer**, and it is the same answer the Obsidian plugin
+the bounty cites gives (`zotero://open-pdf`): the bullet's "seamless viewing within the
+same interface" is not reachable by any plugin on this platform, first- or third-party.
+
 ## ⚠️ An invalid CSL style is an HTTP **500**, not a 400 — and only when there's an item to render
 
 Confirmed live 2026-09-07 (the plugin's own `style=` setting, pointed at `not-a-style`),

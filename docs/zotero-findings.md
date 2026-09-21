@@ -238,6 +238,27 @@ server neither we nor Amplenote control. Not acceptable for a research library.
 the bounty cites gives (`zotero://open-pdf`): the bullet's "seamless viewing within the
 same interface" is not reachable by any plugin on this platform, first- or third-party.
 
+## ✅ Better BibTeX keys arrive through the Web API — no Better BibTeX dependency needed
+
+Observed live 2026-09-21, on the same item a few days apart:
+
+- **Before Better BibTeX was installed in Zotero desktop:** `data.citationKey` was empty,
+  so the plugin's fallback produced `sahay2026` (`\cite{sahay2026}`, parity pass C).
+- **After it was installed** (for testing the Obsidian plugin): the Web API returned
+  `data.citationKey` = `sahayComputingQLDPCCodes2026`, and the plugin used it as-is.
+
+That key has the shape of Better BibTeX's default formula (author, then the first words
+of the title, then the year). The likely explanation — inferred from the timing and the
+key's shape, not confirmed from Better BibTeX's own documentation — is that Better
+BibTeX writes its key into Zotero's native Citation Key field, which syncs up to
+zotero.org and comes back through the API like any other field.
+
+Why it matters: the Obsidian plugin *requires* Better BibTeX and a running Zotero
+desktop to get cite keys. This plugin needs neither — yet someone who does run Better
+BibTeX gets **the same keys** they'd get in Obsidian, with no configuration, because
+`cite-key.js` prefers `citationKey` whenever it's set and only falls back to
+`<author><year>` when it's empty.
+
 ## ⚠️ An invalid CSL style is an HTTP **500**, not a 400 — and only when there's an item to render
 
 Confirmed live 2026-09-07 (the plugin's own `style=` setting, pointed at `not-a-style`),

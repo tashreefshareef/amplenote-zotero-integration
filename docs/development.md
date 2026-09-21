@@ -605,9 +605,14 @@ comment line vanishes for a highlight with no comment and no color.
 3. Paste the compact reference template above. Sync won't rewrite an unchanged item, so
    either edit an item in Zotero, or run **Zotero: Configure sync** and submit (a filter
    change forces a full resync).
-4. Open that item's note: the Reference section should follow the template, with
-   `{{citeKey}}` giving `sahay2026` for the qLDPC paper. Your `## My Notes` text must still
-   be there.
+4. ✅ **Reference template confirmed live, 2026-09-21.** The qLDPC note's Reference
+   section followed the compact template exactly: bold authors, `(2026-09-02)`, the cite
+   key, an APA bibliography (so the `Zotero citation style` setting reaches sync too, not
+   just the picker), `**Abstract:**`, and all three tags comma-joined. `{{citeKey}}` came
+   out as `sahayComputingQLDPCCodes2026` rather than the expected `sahay2026` — not a bug:
+   the item's Zotero Citation Key field had been filled in by Better BibTeX in the
+   meantime, and `cite-key.js` prefers that field. See `zotero-findings.md`.
+   Still to confirm: your `## My Notes` text survived the templated rewrite.
 5. Paste the highlight template, resync, and check the qLDPC highlight renders as a quote
    with `Magenta` and the comment underneath.
 6. Deliberately type `{{titel}}` somewhere and resync — it should appear literally in the

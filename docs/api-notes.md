@@ -398,7 +398,12 @@ several of these cost real debugging time (or a live, reported bug) on this one.
     the escape hatch from Amplenote's text-only settings UI.** Settings are declared as
     `setting | Label` rows in the plugin note's metadata table, read as
     `app.settings["Label"]` (always strings), and rendered by Amplenote as a plain text
-    input: there is no color picker, no dropdown, no validation. `app.prompt` is no help
+    input: there is no color picker, no dropdown, no validation. **It is also
+    single-line — confirmed live 2026-09-21 (Zotero integration project): pressing Enter
+    in a settings field inserts no newline.** So any setting that needs line breaks (a
+    template, a list) must use an escape the plugin decodes; the Zotero plugin treats a
+    literal `\n` as one (`src/template.js`). Only the Account Settings UI is single-line —
+    `app.setSetting` writing a value with a real newline is untested. `app.prompt` is no help
     either - its input types are checkbox/date/embed/note/radio/secureText/select/
     string/tags/text, and none of them is a color. **But an embed is arbitrary HTML that
     you control**, so the pattern for any preference that deserves a real UI is: build

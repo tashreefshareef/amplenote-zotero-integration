@@ -547,9 +547,9 @@ cover what it's normally for:
 - **An unknown placeholder is left as written.** A typo like `{{titel}}` shows up
   verbatim in the note, so it's obvious — rather than silently eating a field.
 
-**Line breaks:** Amplenote shows settings as a plain text input, and whether it accepts
-a real newline is unverified. So a literal `\n` also counts as a line break — if the
-field won't take Enter, write the template on one line with `\n` between lines.
+**Line breaks:** Amplenote's settings fields are single-line (confirmed live — Enter
+inserts nothing), so **write the template on one line, with a literal `\n` wherever you
+want a line break.**
 
 ### Reference placeholders
 
@@ -601,9 +601,7 @@ comment line vanishes for a highlight with no comment and no color.
 
 1. Add the two rows to the plugin note's metadata table (see "Setting up the plugin
    note").
-2. **Line breaks first:** in Account Settings → Plugins → Zotero Integration → Settings,
-   try pressing Enter inside `Zotero reference template`. Note whether the field takes a
-   newline — that decides whether you use real line breaks or `\n`.
+2. ~~Line breaks~~ — settled live: the field is single-line, so use `\n`.
 3. Paste the compact reference template above. Sync won't rewrite an unchanged item, so
    either edit an item in Zotero, or run **Zotero: Configure sync** and submit (a filter
    change forces a full resync).

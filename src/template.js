@@ -25,10 +25,9 @@
 const PLACEHOLDER = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
 
 /**
- * Amplenote renders a setting as a plain text input (api-notes.md #9c) and whether it
- * accepts literal newlines is unverified — so a backslash-n in the setting counts as a
- * line break too. A real newline works the same way; both forms are supported so the
- * template behaves the same whichever the field turns out to allow.
+ * Amplenote's settings fields are single-line — confirmed live 2026-09-21, Enter inserts
+ * no newline (api-notes.md #9c). So a literal backslash-n in the setting is how a user
+ * writes a line break. A real newline is accepted too, for a value written some other way.
  */
 export function normalizeTemplate(raw) {
   return (raw || "").replace(/\\n/g, "\n");

@@ -515,7 +515,7 @@ usually means."* — no mention of the API key.
 
 **Pass C is live-verified, and with it all three parity passes.**
 
-## Layout templates — implemented, not yet live-checked
+## Layout templates — live-verified, 2026-09-21
 
 The Obsidian reference plugin's templating, by outcome. Two optional settings; leave
 either blank for the built-in layout.
@@ -612,8 +612,12 @@ comment line vanishes for a highlight with no comment and no color.
    out as `sahayComputingQLDPCCodes2026` rather than the expected `sahay2026` — not a bug:
    the item's Zotero Citation Key field had been filled in by Better BibTeX in the
    meantime, and `cite-key.js` prefers that field. See `zotero-findings.md`.
-   Still to confirm: your `## My Notes` text survived the templated rewrite.
-5. Paste the highlight template, resync, and check the qLDPC highlight renders as a quote
-   with `Magenta` and the comment underneath.
+   `## My Notes` text and a user-added `## Scratch` section both survived the templated
+   rewrite.
+5. ✅ **Highlight template confirmed live, 2026-09-21.** The qLDPC highlight rendered as a
+   quote ending `— p. 1 Open in Zotero`, with `**Magenta** · <comment>` beneath it. That
+   second line sits *inside* the quote: a line directly under a `>` line continues the
+   blockquote in markdown ("lazy continuation"). It reads well, so it's left as is — but
+   a template that wants the comment outside the quote needs a blank line (`\n\n`) before it.
 6. Deliberately type `{{titel}}` somewhere and resync — it should appear literally in the
    note.

@@ -2,6 +2,8 @@ import {
   SETTING_ZOTERO_API_KEY,
   SETTING_ZOTERO_SYNC_FILTER,
   SETTING_ZOTERO_CITATION_STYLE,
+  SETTING_REFERENCE_TEMPLATE,
+  SETTING_HIGHLIGHT_TEMPLATE,
   DEFAULT_CITATION_STYLE,
   REFERENCE_HEADING,
   ZOTERO_NOTES_HEADING,
@@ -13,6 +15,8 @@ import { loadSyncState, saveSyncState } from "../sync-state.js";
 import { writeSection, countHeadingOccurrences } from "../note-sections.js";
 import { parseFilterSetting, filterSignature } from "../sync-filter.js";
 import { colorCategory } from "../annotation-color.js";
+import { renderTemplate } from "../template.js";
+import { deriveCiteKey } from "../cite-key.js";
 
 /**
  * Deep link into Zotero *desktop* at the highlight's own page — the same
@@ -22,10 +26,15 @@ import { colorCategory } from "../annotation-color.js";
  * `pageIndex + 1`. ⚠️ Unverified live on two counts: whether Amplenote keeps a
  * `zotero://` (non-http) link clickable, and whether the +1 lands on the right page.
  */
-function zoteroOpenLink(a) {
+function zoteroOpenUrl(a) {
   if (!a.attachmentKey) return "";
   const page = Number.isInteger(a.pageIndex) ? `?page=${a.pageIndex + 1}` : "";
-  return `[Open in Zotero](zotero://open-pdf/library/items/${a.attachmentKey}${page})`;
+  return `zotero://open-pdf/library/items/${a.attachmentKey}${page}`;
+}
+
+function zoteroOpenLink(a) {
+  const url = zoteroOpenUrl(a);
+  return url ? `[Open in Zotero](${url})` : "";
 }
 
 /**
@@ -59,7 +68,23 @@ async function fetchSyncItems(client, filter, sinceVersion, style) {
   return client.syncFilteredItems({ sinceVersion, collectionKeys, tagNames: filter.tags, itemTypes, style });
 }
 
-function renderAnnotation(a) {
+/** Fields a user's highlight template can use — see docs/development.md. */
+function annotationValues(a) {
+  const link = zoteroOpenLink(a);
+  return {
+    text: a.text || "",
+    comment: a.comment || "",
+    color: colorCategory(a.color),
+    page: a.pageLabel || "",
+    type: a.type || "",
+    link,
+    linkUrl: zoteroOpenUrl(a),
+  };
+}
+
+function renderAnnotation(a, template) {
+  if (template && template.trim()) return renderTemplate(template, annotationValues(a));
+
   const page = a.pageLabel ? ` (p. ${a.pageLabel})` : "";
   // Color name first, as the reference plugin does ("**(Yellow)** - text"), then the
   // page-precise link on the same line so it stays attached to its highlight.
@@ -78,12 +103,41 @@ function renderAnnotation(a) {
   return `_${a.type || "annotation"}${page}_${tail}\n`;
 }
 
-function renderAnnotations(annotations) {
+function renderAnnotations(annotations, template) {
   if (!annotations.length) return "_No highlights or notes yet._\n";
-  return annotations.map(renderAnnotation).join("\n");
+  return annotations.map((a) => renderAnnotation(a, template)).join("\n");
 }
 
-function renderReference(item, extras) {
+/** Fields a user's reference template can use — see docs/development.md. */
+function referenceValues(item, extras) {
+  const attachmentLinks = extras.attachments
+    .filter((att) => att.url)
+    .map((att) => `[View "${att.title}" in Zotero](${att.url})`)
+    .join("\n");
+  const authors = (item.creators || [])
+    .map((c) => [c.firstName, c.lastName].filter(Boolean).join(" ") || c.name || "")
+    .filter(Boolean)
+    .join(", ");
+
+  return {
+    title: item.title || "",
+    bibliography: item.bib || "",
+    citation: item.citation || "",
+    abstract: item.abstract || "",
+    authors,
+    date: item.date || "",
+    tags: (item.tags || []).join(", "),
+    itemKey: item.key || "",
+    citeKey: deriveCiteKey(item),
+    zoteroUrl: item.url || "",
+    zoteroLink: item.url ? `[View in Zotero](${item.url})` : "",
+    attachmentLinks,
+  };
+}
+
+function renderReference(item, extras, template) {
+  if (template && template.trim()) return renderTemplate(template, referenceValues(item, extras));
+
   const lines = [item.bib || item.citation || item.title];
   if (item.abstract) lines.push("", item.abstract);
   if (item.url) lines.push("", `[View in Zotero](${item.url})`);
@@ -102,11 +156,11 @@ const MY_NOTES_PLACEHOLDER = "_Anything you write in this section is yours — s
 
 /** The full note, used only at creation (and for a one-time migration of a note that
  * predates the sectioned layout). Every later write is per-section. */
-function renderItemNote(item, extras) {
+function renderItemNote(item, extras, tpl = {}) {
   return [
     `## ${REFERENCE_HEADING}`,
     "",
-    renderReference(item, extras).trim(),
+    renderReference(item, extras, tpl.reference).trim(),
     "",
     `## ${ZOTERO_NOTES_HEADING}`,
     "",
@@ -114,7 +168,7 @@ function renderItemNote(item, extras) {
     "",
     `## ${HIGHLIGHTS_HEADING}`,
     "",
-    renderAnnotations(extras.annotations).trim(),
+    renderAnnotations(extras.annotations, tpl.highlight).trim(),
     "",
     `## ${MY_NOTES_HEADING}`,
     "",
@@ -213,6 +267,11 @@ export async function syncLibrary(app) {
   const sinceVersion = filterChanged ? undefined : state.libraryVersion ?? undefined;
 
   const style = (app.settings[SETTING_ZOTERO_CITATION_STYLE] || "").trim() || DEFAULT_CITATION_STYLE;
+  // Blank templates mean the built-in layout; see src/template.js.
+  const tpl = {
+    reference: app.settings[SETTING_REFERENCE_TEMPLATE] || "",
+    highlight: app.settings[SETTING_HIGHLIGHT_TEMPLATE] || "",
+  };
 
   let result;
   try {
@@ -244,17 +303,17 @@ export async function syncLibrary(app) {
         }
         if (await isSectioned(app, uuid)) {
           const label = `"${item.title}"`;
-          await writeSection(app, uuid, REFERENCE_HEADING, renderReference(item, extras), sectionOpts(label));
+          await writeSection(app, uuid, REFERENCE_HEADING, renderReference(item, extras, tpl.reference), sectionOpts(label));
           await writeSection(app, uuid, ZOTERO_NOTES_HEADING, renderZoteroNotes(extras.notes), sectionOpts(label));
-          await writeSection(app, uuid, HIGHLIGHTS_HEADING, renderAnnotations(extras.annotations), sectionOpts(label));
+          await writeSection(app, uuid, HIGHLIGHTS_HEADING, renderAnnotations(extras.annotations, tpl.highlight), sectionOpts(label));
         } else {
-          await app.replaceNoteContent({ uuid }, renderItemNote(item, extras));
+          await app.replaceNoteContent({ uuid }, renderItemNote(item, extras, tpl));
         }
         existing.title = item.title;
         updated++;
       } else {
         const uuid = await app.createNote(item.title, item.tags);
-        await app.insertNoteContent({ uuid }, renderItemNote(item, extras), { atEnd: true });
+        await app.insertNoteContent({ uuid }, renderItemNote(item, extras, tpl), { atEnd: true });
         state.items[item.key] = { noteUUID: uuid, title: item.title };
         created++;
       }
@@ -291,7 +350,7 @@ export async function syncLibrary(app) {
       if (await isSectioned(app, uuid)) {
         await writeSection(app, uuid, ZOTERO_NOTES_HEADING, renderZoteroNotes(extras.notes), sectionOpts(label));
       }
-      await writeSection(app, uuid, HIGHLIGHTS_HEADING, renderAnnotations(extras.annotations), sectionOpts(label));
+      await writeSection(app, uuid, HIGHLIGHTS_HEADING, renderAnnotations(extras.annotations, tpl.highlight), sectionOpts(label));
       highlightsRefreshed++;
     } catch (e) {
       failures.push(`highlights for ${key} (${e.message})`);

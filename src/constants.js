@@ -22,6 +22,11 @@ export const DEFAULT_CITATION_STYLE = "chicago-note-bibliography";
 export const SETTING_ZOTERO_CITATION_STYLE = "Zotero citation style";
 export const SETTING_ZOTERO_CITATION_FORMAT = "Zotero citation format";
 
+// Optional layout templates (src/template.js). Blank = the built-in layout. The first
+// governs an item note's Reference section, the second each imported highlight.
+export const SETTING_REFERENCE_TEMPLATE = "Zotero reference template";
+export const SETTING_HIGHLIGHT_TEMPLATE = "Zotero highlight template";
+
 // Phase 3 sync bookkeeping (key -> noteUUID map, library version watermark) lives in a
 // fenced code block under this heading, in a note with this name. api-notes.md #4: machine
 // data belongs in a fence, never bare paragraph text. #4b: a heading is only as unique as

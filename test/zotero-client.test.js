@@ -329,6 +329,9 @@ describe("createZoteroClient#syncItems", () => {
         citation: "Kahneman, Thinking, Fast and Slow.",
         bib: "Kahneman. 2011.",
         url: "https://www.zotero.org/tashreef/items/ABCD1234",
+        citationKey: "",
+        creators: [],
+        date: "",
       },
     ]);
   });

@@ -108,17 +108,21 @@ needs:
    | setting | Zotero sync filter |
    | setting | Zotero citation style |
    | setting | Zotero citation format |
+   | setting | Zotero reference template |
+   | setting | Zotero highlight template |
 
-   The last two are parity pass C's (see the end of this file), both optional: a CSL
-   style id for every citation/bibliography Zotero renders (`apa`, `ieee`,
-   `chicago-note-bibliography` — blank means the last), and the citation picker's
-   default output format (`formatted`, `bibliography`, `pandoc`, `latex`, `biblatex` —
-   blank means `formatted`).
+   Only **Zotero API key** is required. Every other row is optional and blank by
+   default — but add them all anyway: `app.setSetting` writing to an undeclared label is
+   unconfirmed to work (api-notes.md #9c only confirms the declared-row path).
 
-   The second setting row is Phase 5's collections/tags filter (`Zotero: Configure
-   sync`), left blank by default (blank = sync the whole library). Add the row even if
-   you don't plan to use it yet — `app.setSetting` writing to an undeclared label is
-   unconfirmed to work at all (api-notes.md #9c only confirms the declared-row path).
+   - **Zotero sync filter** — which collections/tags/categories to sync, written by
+     `Zotero: Configure sync`. Blank = the whole library.
+   - **Zotero citation style** — a CSL style id (`apa`, `ieee`, …). Blank =
+     `chicago-note-bibliography`.
+   - **Zotero citation format** — the citation picker's output: `formatted`,
+     `bibliography`, `pandoc`, `latex`, `biblatex`. Blank = ask each time.
+   - **Zotero reference template** / **Zotero highlight template** — custom layouts;
+     blank = the built-in layout. See "Layout templates" at the end of this file.
 
    Use a **read-only** Zotero key (generate one at
    <https://www.zotero.org/settings/keys>). Confirmed live, 2026-09-05, contrary to what
@@ -510,3 +514,103 @@ citation (HTTP 500). Is 'not-a-style' a valid Zotero style id? That's what this 
 usually means."* — no mention of the API key.
 
 **Pass C is live-verified, and with it all three parity passes.**
+
+## Layout templates — implemented, not yet live-checked
+
+The Obsidian reference plugin's templating, by outcome. Two optional settings; leave
+either blank for the built-in layout.
+
+- **`Zotero reference template`** — the body of an item note's `## Reference` section.
+- **`Zotero highlight template`** — each imported highlight, repeated per annotation.
+
+Templates only ever control what's *inside* those sections. The four section headings
+are fixed, because every re-sync writes section-by-section — that's what keeps your
+`## My Notes` and anything else you add safe. So a template can't remove or rename a
+heading, only reshape what sync writes under it.
+
+### Why not Nunjucks, which the reference plugin uses
+
+It's on the order of 100 KB minified. This plugin's whole bundle is ~20 kB, and
+`api-notes.md` #2 records a hard ceiling: **Plugin Builder refuses to sync anything over
+100k characters.** A full template engine would break GitHub sync outright. What people
+actually use those templates for is choosing fields and their order — substitution, not
+evaluation — so `src/template.js` is ~40 lines and cost the bundle 1.4 kB.
+
+### Syntax
+
+`{{name}}` is replaced by that field. That's all of it — no `{% if %}`, because two rules
+cover what it's normally for:
+
+- **A line whose placeholders are all empty is dropped.** `**Abstract:** {{abstract}}`
+  disappears for an item with no abstract, instead of leaving a dangling label. A line
+  survives if any one of its placeholders has content.
+- **An unknown placeholder is left as written.** A typo like `{{titel}}` shows up
+  verbatim in the note, so it's obvious — rather than silently eating a field.
+
+**Line breaks:** Amplenote shows settings as a plain text input, and whether it accepts
+a real newline is unverified. So a literal `\n` also counts as a line break — if the
+field won't take Enter, write the template on one line with `\n` between lines.
+
+### Reference placeholders
+
+| Placeholder | Value |
+|---|---|
+| `{{title}}` | Item title |
+| `{{bibliography}}` | Formatted bibliography entry, in your citation style |
+| `{{citation}}` | Formatted in-text citation, in your citation style |
+| `{{abstract}}` | Abstract |
+| `{{authors}}` | Creators, comma-separated (`Daniel Kahneman, Amos Tversky`) |
+| `{{date}}` | Publication date as stored in Zotero |
+| `{{tags}}` | Zotero tags, comma-separated |
+| `{{citeKey}}` | Cite key — Zotero's Citation Key field, else `<author><year>` |
+| `{{itemKey}}` | Zotero's own item key |
+| `{{zoteroLink}}` | `[View in Zotero](...)` link |
+| `{{zoteroUrl}}` | That link's bare URL |
+| `{{attachmentLinks}}` | One `[View "file.pdf" in Zotero](...)` line per attachment |
+
+### Highlight placeholders
+
+| Placeholder | Value |
+|---|---|
+| `{{text}}` | The highlighted text |
+| `{{comment}}` | Your comment on it |
+| `{{color}}` | Color name (`Yellow`, `Magenta`, …) |
+| `{{page}}` | Page label |
+| `{{type}}` | `highlight`, `note`, `underline`, … |
+| `{{link}}` | `[Open in Zotero](zotero://...)`, opens desktop Zotero at the page |
+| `{{linkUrl}}` | That link's bare URL |
+
+### Starter templates
+
+A compact reference, one line per field (paste as-is if the field accepts `\n`):
+
+```
+**{{authors}}** ({{date}}) · `{{citeKey}}`\n{{bibliography}}\n**Abstract:** {{abstract}}\n**Tags:** {{tags}}\n{{zoteroLink}}
+```
+
+A highlight as a quote with its comment beneath:
+
+```
+> {{text}} — p. {{page}} {{link}}\n**{{color}}** · {{comment}}
+```
+
+Because empty lines drop, the `**Tags:**` line vanishes for an untagged item, and the
+comment line vanishes for a highlight with no comment and no color.
+
+### Live check
+
+1. Add the two rows to the plugin note's metadata table (see "Setting up the plugin
+   note").
+2. **Line breaks first:** in Account Settings → Plugins → Zotero Integration → Settings,
+   try pressing Enter inside `Zotero reference template`. Note whether the field takes a
+   newline — that decides whether you use real line breaks or `\n`.
+3. Paste the compact reference template above. Sync won't rewrite an unchanged item, so
+   either edit an item in Zotero, or run **Zotero: Configure sync** and submit (a filter
+   change forces a full resync).
+4. Open that item's note: the Reference section should follow the template, with
+   `{{citeKey}}` giving `sahay2026` for the qLDPC paper. Your `## My Notes` text must still
+   be there.
+5. Paste the highlight template, resync, and check the qLDPC highlight renders as a quote
+   with `Magenta` and the comment underneath.
+6. Deliberately type `{{titel}}` somewhere and resync — it should appear literally in the
+   note.

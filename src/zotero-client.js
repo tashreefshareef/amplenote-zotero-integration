@@ -29,6 +29,12 @@ function mapSyncItem(item) {
     citation: stripHtmlToText(item.citation),
     bib: stripHtmlToText(item.bib),
     url: item.links?.alternate?.href || null,
+    // Same three fields searchItems carries for cite-key.js — sync needs them too, for
+    // the reference template's {{authors}}, {{date}} and {{citeKey}}. Missing here, they
+    // rendered blank for every synced item.
+    citationKey: item.data?.citationKey || "",
+    creators: item.data?.creators || [],
+    date: item.data?.date || "",
   };
 }
 

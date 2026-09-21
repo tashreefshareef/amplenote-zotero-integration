@@ -190,3 +190,86 @@ describe("sectioned item notes", () => {
     expect(content).toContain("_Comment: key idea_");
   });
 });
+
+describe("layout templates", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test("a reference template replaces the built-in Reference layout", async () => {
+    const app = createMockApp({
+      settings: {
+        "Zotero API key": "k",
+        "Zotero reference template": "# {{title}}\nBy {{authors}} ({{date}})\n**Abstract:** {{abstract}}\nKey: {{citeKey}}",
+      },
+    });
+    mockFetchSequence(
+      fakeResponse({ body: { userID: 1 } }),
+      fakeResponse({
+        headers: { "Last-Modified-Version": "99" },
+        body: [{ ...KAHNEMAN, data: { ...KAHNEMAN.data, creators: [{ lastName: "Kahneman" }], date: "2011" } }],
+      }),
+      fakeResponse({ body: [] })
+    );
+
+    await syncLibrary(app);
+
+    const call = app._calls.createdNotes.find((c) => c.name === "Thinking, Fast and Slow");
+    const content = app._notes.get(call.uuid).content;
+    expect(content).toContain("# Thinking, Fast and Slow");
+    expect(content).toContain("By Kahneman (2011)");
+    expect(content).toContain("**Abstract:** A summary.");
+    expect(content).toContain("Key: kahneman2011");
+    expect(content).not.toContain("Kahneman. 2011."); // built-in bibliography line is gone
+    expect(content).toContain("## My Notes"); // section scaffolding still intact
+  });
+
+  test("a highlight template replaces the built-in highlight layout", async () => {
+    const app = createMockApp({
+      settings: { "Zotero API key": "k", "Zotero highlight template": "- {{text}} [{{color}} p{{page}}]" },
+    });
+    const attachment = { key: "ATT1", data: { itemType: "attachment", title: "p.pdf" }, links: {} };
+    const highlight = {
+      key: "ANN1",
+      data: {
+        itemType: "annotation",
+        annotationType: "highlight",
+        annotationText: "System 1",
+        annotationColor: "#ffd400",
+        annotationPageLabel: "12",
+        annotationSortIndex: "1",
+      },
+    };
+    mockFetchSequence(
+      fakeResponse({ body: { userID: 1 } }),
+      fakeResponse({ headers: { "Last-Modified-Version": "99" }, body: [KAHNEMAN] }),
+      fakeResponse({ body: [attachment] }),
+      fakeResponse({ body: [highlight] })
+    );
+
+    await syncLibrary(app);
+
+    const call = app._calls.createdNotes.find((c) => c.name === "Thinking, Fast and Slow");
+    const content = app._notes.get(call.uuid).content;
+    expect(content).toContain("- System 1 [Yellow p12]");
+    expect(content).not.toContain("> **(Yellow)**"); // built-in blockquote form is gone
+  });
+
+  test("blank templates keep the built-in layout exactly", async () => {
+    const app = createMockApp({
+      settings: { "Zotero API key": "k", "Zotero reference template": "", "Zotero highlight template": "   " },
+    });
+    mockFetchSequence(
+      fakeResponse({ body: { userID: 1 } }),
+      fakeResponse({ headers: { "Last-Modified-Version": "99" }, body: [KAHNEMAN] }),
+      fakeResponse({ body: [] })
+    );
+
+    await syncLibrary(app);
+
+    const call = app._calls.createdNotes.find((c) => c.name === "Thinking, Fast and Slow");
+    const content = app._notes.get(call.uuid).content;
+    expect(content).toContain("Kahneman. 2011.");
+    expect(content).toContain("[View in Zotero](https://www.zotero.org/tashreef/items/ABCD1234)");
+  });
+});

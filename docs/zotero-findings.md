@@ -75,16 +75,49 @@ its `<span>` wrapper stripped before `insertText` (see the new dead-end entry be
 brackets); the `bib` field's HTML is usable as-is for a clipboard `text/html` flavor
 (`api-notes.md` lesson #7).
 
-## ⚠️ The local Zotero HTTP server is not reachable from a plugin
+## ❌ The local Zotero HTTP server is not reachable from a plugin — measured 2026-09-21
 
-Zotero runs a local server on `localhost:23119` exposing `/connector/*` endpoints.
-It is unusable here, for two independent reasons — either alone is fatal:
+Zotero runs a local server on `localhost:23119`: `/connector/*` endpoints always, a
+read-only local API under `/api/` behind **Settings → Advanced → "Allow other applications
+on this computer to communicate with Zotero"** (off by default; it answers
+`403 Local API is not enabled` until switched on), and Better BibTeX's JSON-RPC when that
+add-on is installed. It is the only route to a PDF that would come straight off the user's
+disk rather than from Zotero's cloud storage, so it was worth a real test after the
+`files.zotero.net` result below.
 
-- The embed is served over **https**; `http://localhost` is mixed content.
-- Zotero's own docs note "cross-origin restrictions prevent webpages from reading the
-  response."
+Probed from inside the live sandbox (`origin=https://plugins.amplenote.com`, Zotero
+10.0.1 running) against both `localhost` and `127.0.0.1`:
 
-Source: <https://www.zotero.org/support/dev/client_coding/connector_http_server>.
+| Probe | Result |
+|---|---|
+| `/connector/ping`, `mode: "no-cors"` | ❌ `TypeError: Failed to fetch` |
+| `/connector/ping` | ❌ `TypeError: Failed to fetch` |
+| `/api/users/0/items` | ❌ `TypeError: Failed to fetch` |
+| `/better-bibtex/json-rpc` (POST) | ❌ `TypeError: Failed to fetch` |
+
+**The `no-cors` line is the decisive one.** A request that reaches the server in
+`no-cors` mode resolves to an opaque response even when the server sends no CORS headers
+at all; it can only throw if the browser refused to send it. So the block sits in the
+browser, ahead of anything Zotero could answer — the same sandbox reaches
+`api.zotero.org` in the same run, so it is specific to localhost.
+
+What this test could not tell apart: whether the refusal is the sandbox document's
+`connect-src` CSP (the public amplenote.com page has one that lists only Amplenote's own
+hosts and blocks localhost with a console error saying so) or Chromium's local-network
+access policy for a cross-origin iframe. Both belong to Amplenote and the browser, and
+neither is something plugin code can opt out of, so the distinction doesn't change the
+conclusion.
+
+Two corrections to what this entry used to say, which had been reasoned rather than
+measured: `http://localhost` from an https page is **not** mixed content — Chromium
+treats localhost as potentially trustworthy — so that reason was wrong; and Zotero's
+"cross-origin restrictions" note was accurate but never reached, because the request
+doesn't get as far as Zotero. Measured from outside the browser, Zotero's CORS preflight
+reply does carry no `Access-Control-Allow-Origin`, so it would have refused a readable
+response anyway.
+
+Source: <https://www.zotero.org/support/dev/client_coding/connector_http_server>;
+<https://www.zotero.org/support/dev/client_coding/local_api>.
 
 **Consequence for scope, and it is the biggest one on this project:** see the parity note
 below.

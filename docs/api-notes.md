@@ -122,6 +122,20 @@ several of these cost real debugging time (or a live, reported bug) on this one.
    embed-side behaves differently than a normal web page would, "cross-origin iframe
    restriction" should be an early hypothesis, not a last resort.
 
+   **6b. Plugin code cannot reach `localhost` at all — not even in `no-cors` mode.**
+   Measured 2026-09-21 from an `appOption` action (same `plugins.amplenote.com`
+   sandbox as an embed): every `fetch` to `http://localhost:23119` and
+   `http://127.0.0.1:23119` threw `TypeError: Failed to fetch`, including a
+   `mode: "no-cors"` ping, which would resolve opaque if the request had left the
+   browser. So this is the browser refusing to send, ahead of any CORS answer — the
+   public amplenote.com page has a `connect-src` CSP listing only Amplenote hosts, and
+   the sandbox evidently carries an equivalent rule or Chromium's local-network policy
+   for cross-origin iframes; the test could not tell those two apart, and neither is
+   plugin-overridable. A plugin that wants a desktop app's local server (Zotero, a
+   local LLM, a dev server) can't have it. Mixed content is NOT the reason:
+   `http://localhost` from an https page is allowed, Chromium treats it as trustworthy.
+   Full probe table in `docs/zotero-findings.md`.
+
 7. **Manually pasting text into Amplenote's note editor does NOT reliably trigger
    markdown parsing.** Testing a markdown-formatting question by typing/pasting a test
    string into a scratch note and eyeballing the result is a natural first instinct - it

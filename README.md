@@ -10,9 +10,8 @@ Built for the [Amplenote plugin bounty](https://public.amplenote.com/u1ivsVxuqee
 > note per Zotero item, incremental), highlight and note import, and the sync filter by
 > collections, tags and item types — plus citation styles, cite keys and layout templates.
 > A run on an Android phone (2026-10-10) passed every action but one; that one, Search
-> citation, is fixed and re-verified on the phone (`docs/mobile-check.md`). Left: the
-> settings-page check on mobile, user instructions and screenshots, and submission. See
-> `docs/roadmap.md`.
+> citation, is fixed and re-verified on the phone (`docs/mobile-check.md`). Left: user
+> instructions and screenshots, and submission. See `docs/roadmap.md`.
 
 ## Start here
 

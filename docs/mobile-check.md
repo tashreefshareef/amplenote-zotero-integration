@@ -25,7 +25,7 @@ over `adb` (injected taps/swipes, screenshots, `uiautomator` dumps — not a fin
 | 3 | `Zotero: Search citation` | Search → `zotero` | Same, appended to the note's end | **FAIL, then fixed.** First run: alert said "Appended", but the open note was unchanged — a **new "untitled note"** was created holding the citation (`api-notes.md` #19). After the fix, rerun the same way (test note open, action from search): the "No open note…" alert appears before any search prompt, note count unchanged at 601, no stray note. So on Android this action can't append at all from search; `/zotero` (row 2) is the mobile path. |
 | 4 | `Zotero: Sync now` | Search → `zotero` | Runs to completion, `Zotero Sync` note updates | **Pass.** "0 new, 0 updated, 4 highlights refreshed" in under 5 s. Library was already in sync, so a long backgrounded first sync is still untested. |
 | 5 | `Zotero: Configure sync` | Search → `zotero configure` | Every collection/tag/category checkbox reachable and tappable | **Pass.** ~40 rows scroll to the last item type; a tap toggles a checkbox; Submit/Cancel reachable at the bottom. Cancelled, filter unchanged. |
-| 6 | Settings page | Account Settings → Plugins → Zotero Integration → Settings | All seven rows editable | Not run. |
+| 6 | Settings page | Side menu → account name → Settings → Installed plugins → Zotero Integration → Plugin settings | All six settings editable | **Pass, with one awkward step.** Six fields (the note's seventh row is `name`, not a setting), all rendered. A long template is editable: tapping it opens the keyboard, and moving the cursor to the start scrolls the field to `**{{authors}}** …`. But the page does **not** scroll the focused field into view — the keyboard covers it until you scroll the page yourself, which works. Edits need an explicit **Save settings**; this run typed nothing and left via Cancel. The API key shows in plain text here, same as in the note. |
 | 7 | `zotero://` deep link | Tap **Open in Zotero** on a highlight (no item had an Open PDF link) | Unknown — see below | **No-op, as predicted.** Tapping the link opens Amplenote's link popup; its open icon fires a `VIEW` intent for `zotero://open-pdf/…` (logcat), no app handles it, nothing visible happens, no error. Rechecked with the Zotero Android app installed: still unresolved (see note 7). `View in Zotero` is an https zotero.org link and is unaffected. |
 
 Synced item notes render correctly on the phone: Reference, Zotero Notes, highlights with
@@ -47,7 +47,7 @@ color label and comment, and the user-owned My Notes section.
    (`configure-sync.js`), which on a full library is dozens of rows in one dialog. Desktop
    scrolls it fine. If a phone truncates it with no scroll, the filter cannot be edited on
    mobile at all, and the honest fix is a documented "configure on desktop", not a rebuild.
-6. **Settings page** — seven single-line rows (#9c), two of which hold templates written
+6. **Settings page** — six single-line settings (#9c), two of which hold templates written
    with literal `\n`. Check that a long template is *editable*, not just visible.
 7. **Deep link** — `zotero://open-pdf/...` needs an app registered for the scheme. **There
    IS a Zotero app for Android (`org.zotero.android`), but it does not register `zotero://`.**

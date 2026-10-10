@@ -11,15 +11,25 @@ Run every action once on a phone and fill the Result column in. Anything that re
 is awkward still counts as a pass — record it as a note, not a failure; the fix for a
 cramped prompt is copy, not code.
 
+Only `Insert citation` is in the `/` menu — it is the one `insertText` action. The other four
+are `appOption`s: on Android they are reached from the **search icon → Note Lookup**, typing
+`zotero` (the same list desktop shows under Ctrl+O).
+
+**Run 2026-10-10, Samsung Galaxy Note20 Ultra (SM-N986U), Amplenote Android app**, driven
+over `adb` (injected taps/swipes, screenshots, `uiautomator` dumps — not a finger).
+
 | # | Action | How to run it | Expected | Result |
 |---|---|---|---|---|
-| 1 | `Zotero: Test connection` | `/zotero` in any note | Alert: username, userID, access scope | |
-| 2 | `Zotero: Insert citation` | `/zotero`, under **Insert** | Search box → results list → citation lands **at the cursor** | |
-| 3 | `Zotero: Search citation` | `/zotero` | Same, appended to the note's end | |
-| 4 | `Zotero: Sync now` | `/zotero` | Runs to completion, `Zotero Sync` note updates | |
-| 5 | `Zotero: Configure sync` | `/zotero` | Every collection/tag/category checkbox reachable and tappable | |
-| 6 | Settings page | Account Settings → Plugins → Zotero Integration → Settings | All seven rows editable | |
-| 7 | `zotero://` deep link | Tap **Open PDF** in a synced item note | Unknown — see below | |
+| 1 | `Zotero: Test connection` | Search → `zotero` | Alert: username, userID, access scope | **Pass.** Alert shows username, userID, scope. |
+| 2 | `Zotero: Insert citation` | `/zotero`, under **Insert** | Search box → results list → citation lands **at the cursor** | **Pass.** Prompt is full-screen; Submit stays above the soft keyboard. Results `select` opens as a native bottom sheet. Cite key replaced the `/zotero` token in place. |
+| 3 | `Zotero: Search citation` | Search → `zotero` | Same, appended to the note's end | **FAIL, then fixed.** First run: alert said "Appended", but the open note was unchanged — a **new "untitled note"** was created holding the citation (`api-notes.md` #19). After the fix, rerun the same way (test note open, action from search): the "No open note…" alert appears before any search prompt, note count unchanged at 601, no stray note. So on Android this action can't append at all from search; `/zotero` (row 2) is the mobile path. |
+| 4 | `Zotero: Sync now` | Search → `zotero` | Runs to completion, `Zotero Sync` note updates | **Pass.** "0 new, 0 updated, 4 highlights refreshed" in under 5 s. Library was already in sync, so a long backgrounded first sync is still untested. |
+| 5 | `Zotero: Configure sync` | Search → `zotero configure` | Every collection/tag/category checkbox reachable and tappable | **Pass.** ~40 rows scroll to the last item type; a tap toggles a checkbox; Submit/Cancel reachable at the bottom. Cancelled, filter unchanged. |
+| 6 | Settings page | Account Settings → Plugins → Zotero Integration → Settings | All seven rows editable | Not run. |
+| 7 | `zotero://` deep link | Tap **Open in Zotero** on a highlight (no item had an Open PDF link) | Unknown — see below | **No-op, as predicted.** Tapping the link opens Amplenote's link popup; its open icon fires a `VIEW` intent for `zotero://open-pdf/…` (logcat), no app handles it, nothing visible happens, no error. Rechecked with the Zotero Android app installed: still unresolved (see note 7). `View in Zotero` is an https zotero.org link and is unaffected. |
+
+Synced item notes render correctly on the phone: Reference, Zotero Notes, highlights with
+color label and comment, and the user-owned My Notes section.
 
 ## What each one is actually testing
 
@@ -39,7 +49,11 @@ cramped prompt is copy, not code.
    mobile at all, and the honest fix is a documented "configure on desktop", not a rebuild.
 6. **Settings page** — seven single-line rows (#9c), two of which hold templates written
    with literal `\n`. Check that a long template is *editable*, not just visible.
-7. **Deep link** — `zotero://open-pdf/...` needs an app registered for the scheme. There is
-   **no Zotero app for Android at all**, and iOS Zotero's scheme support is unconfirmed, so
-   expect nothing to happen on Android. This is a documentation outcome, not a bug: the
-   user-facing instructions should say highlights link back to a desktop Zotero.
+7. **Deep link** — `zotero://open-pdf/...` needs an app registered for the scheme. **There
+   IS a Zotero app for Android (`org.zotero.android`), but it does not register `zotero://`.**
+   Checked 2026-10-10 with it installed: its manifest declares `VIEW` only for `content:`/
+   `file:` PDFs and EPUBs, and `am start` with both `zotero://open-pdf/...` and
+   `zotero://select/...` fails with "unable to resolve Intent". So installing Zotero changes
+   nothing — the link still goes nowhere on Android. iOS Zotero's scheme support is
+   unconfirmed. This is a documentation outcome, not a bug: the user-facing instructions
+   should say highlights link back to a desktop Zotero.

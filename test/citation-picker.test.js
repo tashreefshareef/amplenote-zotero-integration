@@ -284,4 +284,21 @@ describe("searchAndAppendCitation", () => {
     expect(app._notes.get("note-1").content).toBe("Existing content\n");
     expect(app._calls.insertedContent).toHaveLength(0);
   });
+
+  // Live, Android 2026-10-10: run from the search overlay, noteUUID was absent and
+  // insertNoteContent created a stray untitled note instead of failing.
+  test("refuses before searching when there is no note in context", async () => {
+    const app = createMockApp({
+      settings: { "Zotero API key": "k", "Zotero citation format": "formatted" },
+      promptQueue: ["kahneman", "ABCD1234"],
+    });
+    const fetchImpl = mockFetchSequence();
+
+    await searchAndAppendCitation(app);
+
+    expect(app._calls.prompts).toHaveLength(0);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(app._calls.insertedContent).toHaveLength(0);
+    expect(app._calls.alerts[0]).toMatch(/No open note/);
+  });
 });

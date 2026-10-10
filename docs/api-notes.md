@@ -901,6 +901,20 @@ several of these cost real debugging time (or a live, reported bug) on this one.
     would still recover the case this was originally built for if a genuine uuid-to-name
     mismatch ever does occur.
 
+19. **An `appOption` can run with NO `app.context.noteUUID` even while a note is open —
+    and `insertNoteContent({ uuid: undefined }, ...)` then CREATES A NEW NOTE instead of
+    failing.** Confirmed live on the Android app, 2026-10-10 (Zotero integration). On
+    Android, `appOption`s are not in the `/` menu (only `insertText` is — unlike desktop,
+    where `/` lists both); they are reached from the search icon → Note Lookup. Run from
+    there with a note open, `noteUUID` was falsy: a guard alerting on `!noteUUID` fired.
+    Before that guard existed, the append wrote into a brand-new "untitled note" — no
+    throw, so the plugin's own "Appended" alert reported success. An older stray note
+    with the same content suggests desktop does the same when Ctrl+O runs with no note
+    focused (not reproduced). **Any `appOption` that writes to "the current note" must
+    check `noteUUID` first and refuse** — the platform will not stop it. Phone-side
+    detail worth knowing: `insertText` (via `/`) is the reliable way to act on the open
+    note on mobile. See `src/actions/citation-picker.js`'s `searchAndAppendCitation`.
+
 ## Core types
 
 **`noteHandle`** — an object, minimally `{ uuid: string }`. May also carry `name` and
@@ -927,7 +941,7 @@ string. `app.context.noteUUID` is a bare string, so wrap it: `{ uuid: app.contex
 
 | Property | Type | Notes |
 |---|---|---|
-| `noteUUID` | `String` | uuid of the note the action was invoked from. |
+| `noteUUID` | `String` | uuid of the note the action was invoked from. **Can be absent for an `appOption`, even with a note open** — see finding 19. |
 | `embedArgs` | **`Array`** | Available in `onEmbedCall`. It's an array, not an object. |
 | `updateEmbedArgs` | `(newArgs)` | **Does NOT trigger a re-render.** Must be followed by `renderEmbed()`. |
 | `renderEmbed` | `()` | Re-renders the embed with the current args. |
@@ -1194,6 +1208,17 @@ Practical workarounds when pasting/typing code in:
   most one surplus brace at the very end.
 - Always verify balance before running: count `{` vs `}` in `.cm-content`.
 - Real edits should use the GitHub→Amplenote sync plugin rather than typing.
+
+**A hand paste can leave the plugin un-installable, and it only shows as a badge.**
+2026-10-10 (Zotero integration): after `dist/plugin-paste.js` was pasted by hand on
+desktop, the Android app showed a red "Plugin error" badge on the plugin note; tapping it
+read "Plugin install failed — Code is missing", and every one of the plugin's actions
+vanished from search. The stored code DID contain the new build (full-text search found
+its strings) and ended in the correct `return plugin; })()`. A second paste of the same
+file fixed it. Cause not pinned down — nothing in the note looked wrong from the phone,
+which can't show a long code block whole. **After any hand paste, check the plugin note
+for the error badge before testing anything** — a missing action looks like a
+plugin bug when it is an install failure.
 
 ## Still unverified
 

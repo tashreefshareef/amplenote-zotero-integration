@@ -127,10 +127,22 @@ export async function insertCitationAtCursor(app) {
  * appOption entry point, for quick search. insertText places text at the cursor;
  * appOption cannot (no positional write API — docs/api-notes.md #11/#17), so this
  * appends to the end of the note instead, via the one write insertNoteContent supports.
+ *
+ * An appOption can run with no note in context: confirmed live 2026-10-10 on Android,
+ * launched from the search overlay with a note open. insertNoteContent with no uuid
+ * doesn't throw — it creates a new untitled note and the "Appended" alert lies. So
+ * refuse up front, before the user spends a search on it.
  */
 export async function searchAndAppendCitation(app) {
+  const noteUUID = app.context?.noteUUID;
+  if (!noteUUID) {
+    await app.alert(
+      "No open note to add the citation to. Open a note and type /zotero to insert a citation at the cursor."
+    );
+    return;
+  }
   const picked = await pickCitation(app);
   if (!picked) return;
-  await app.insertNoteContent({ uuid: app.context.noteUUID }, `${picked.text}\n`, { atEnd: true });
+  await app.insertNoteContent({ uuid: noteUUID }, `${picked.text}\n`, { atEnd: true });
   await app.alert(`Appended: ${picked.text}`);
 }

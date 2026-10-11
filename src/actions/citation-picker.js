@@ -115,8 +115,9 @@ export async function pickCitation(app) {
  * Integration") at the cursor to trigger it. The returned string replaces that
  * expression in place — a plain-text substitution, not parsed note content
  * (docs/api-notes.md #11). Returns "" rather than undefined on cancel so the macro
- * token disappears rather than risking a literal "undefined" landing in the note —
- * which of the two actually happens is unverified until this runs live.
+ * token disappears rather than risking a literal "undefined" landing in the note.
+ * Confirmed live on Android, 2026-10-11: cancelling the results list removed the
+ * `/zotero` token and left nothing behind.
  */
 export async function insertCitationAtCursor(app) {
   const picked = await pickCitation(app);

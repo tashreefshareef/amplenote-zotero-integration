@@ -10,8 +10,8 @@ Behavior described here is drawn from the code and from live runs recorded in
 own key page rather than a test here: which permission boxes to tick. If a behavior
 changes, fix it here too.
 
-Screenshots are not captured yet; the table at the bottom lists each one and where it
-goes. Amplenote's table cell takes uploaded images, not markdown image links, so when you
+Screenshots are in `docs/screenshots/`; the table at the bottom lists each one and where
+it goes. Amplenote's table cell takes uploaded images, not markdown image links, so when you
 build the cell in the note editor: paste the text, then drop each image in where its
 `[Screenshot: …]` marker is, and delete the marker.
 
@@ -191,13 +191,16 @@ text, separately from the file.
 
 ## Screenshot files
 
-None captured yet. Capture against a real library item with an abstract, tags, a Zotero
-note and at least one colored, commented highlight — the qLDPC test item has all of
-these. Save them in `docs/screenshots/`.
+Captured 2026-10-11 on the Android app (Samsung SM-N986U) over adb, against the real
+library, and cropped to the content — the phone's status bar is cut off every one.
 
 | File | Shows | Used for |
 |---|---|---|
-| `01-test-connection.png` | The "Connected as …" alert | Set up |
-| `02-citation-picker.png` | The results list open, a reference about to be picked | Cite as you write |
-| `03-synced-item-note.png` | A synced item note with all four sections visible | Sync your library into notes |
-| `04-configure-sync.png` | The Configure sync dialog, a couple of boxes ticked | Choose what to sync |
+| `01-test-connection.png` | The "Connected as …" alert, username and user ID blanked out | Set up |
+| `02-citation-picker.png` | Results for "zotero": the reference list open, two items | Cite as you write |
+| `03-synced-item-note.png` | The qLDPC item note: title, tags, Reference, then — after a divider band — Zotero Notes, a magenta highlight with page, link and comment, and the My Notes heading. Two screens joined; the abstract between them is skipped | Sync your library into notes |
+| `04-configure-sync.png` | The Configure sync dialog, a collection and a tag ticked | Choose what to sync |
+
+The Configure sync shot was taken without submitting — the boxes were ticked for the
+picture and the dialog closed, so the real filter is unchanged. All four are mobile;
+the listing has no desktop shot yet.

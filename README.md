@@ -23,6 +23,7 @@ Built for the [Amplenote plugin bounty](https://public.amplenote.com/u1ivsVxuqee
 | [`docs/api-notes.md`](docs/api-notes.md) | Confirmed Amplenote API signatures and platform quirks. **Carried over and still living** — its "Lessons for the NEXT Amplenote plugin" section was written for this project |
 | [`docs/bugs-found.md`](docs/bugs-found.md) | General web-platform bugs and fixes. Also carried over, also still living |
 | [`docs/development.md`](docs/development.md) | Build, test, and how to set up the plugin note in Amplenote |
+| [`docs/plugin-instructions.md`](docs/plugin-instructions.md) | The end-user instructions, ready to paste into the plugin note's instructions cell, plus the screenshots still to capture |
 | [`docs/mobile-check.md`](docs/mobile-check.md) | The Android checklist and its results — where each action lives on mobile, and what does not work there |
 
 ## The short version of the research

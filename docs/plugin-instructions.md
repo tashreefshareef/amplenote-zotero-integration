@@ -38,12 +38,14 @@ sign in to Zotero.
 3. Run **Zotero: Test connection** (below for where to find it). It should answer with
    your Zotero username. If it says the key was rejected, check it was copied whole.
 
-[Screenshot: 01-test-connection]
+[Screenshot: desktop-01-test-connection]
 
 **Where the actions live.** On desktop, type `/zotero` in any note: all five actions are
 listed. On a phone, `/zotero` lists only **Insert citation**; for the other four — Test
 connection, Search citation, Sync now, Configure sync — tap the **search icon** and type
 `zotero`.
+
+[Screenshot: desktop-00-zotero-menu]
 
 ### Cite as you write
 
@@ -51,7 +53,7 @@ Type `/zotero` where you want the citation and pick **Zotero: Insert citation**.
 by title, author or year, pick the reference from the list, and the citation replaces
 what you typed — right at the cursor.
 
-[Screenshot: 02-citation-picker]
+[Screenshot: desktop-02-citation-picker]
 
 It asks which format you want each time, unless you set one:
 
@@ -85,7 +87,7 @@ the item and tagged with its Zotero tags, laid out in four sections:
   with its color, page, and comment.
 - **My Notes** — yours. Write anything here.
 
-[Screenshot: 03-synced-item-note]
+[Screenshot: desktop-03-synced-item-note]
 
 **Run Sync now again whenever you want to catch up.** After the first run it only fetches
 what changed in Zotero since last time, so it's quick. It's safe to stop and re-run.
@@ -111,7 +113,7 @@ sync** and tick the collections, tags and item types you want; leave everything 
 to go back to syncing the whole library. Changing the selection makes the next sync a full
 one, so newly included items come across.
 
-[Screenshot: 04-configure-sync]
+[Screenshot: desktop-04-configure-sync]
 
 Use Configure sync rather than typing into the **Zotero sync filter** setting — the
 setting holds the result, but the dialog writes it in the form the plugin reads.
@@ -191,16 +193,31 @@ text, separately from the file.
 
 ## Screenshot files
 
-Captured 2026-10-11 on the Android app (Samsung SM-N986U) over adb, against the real
-library, and cropped to the content — the phone's status bar is cut off every one.
+Two sets, both captured 2026-10-11 against the real library and cropped to the content.
+The instructions cell uses the **desktop** set; the phone set is there if a mobile
+section ever wants pictures.
+
+**Desktop** — Amplenote web in Chrome. The editor column only, so the notes sidebar
+(other notes' titles) is never in frame.
 
 | File | Shows | Used for |
 |---|---|---|
-| `01-test-connection.png` | The "Connected as …" alert, username and user ID blanked out | Set up |
-| `02-citation-picker.png` | Results for "zotero": the reference list open, two items | Cite as you write |
-| `03-synced-item-note.png` | The qLDPC item note: title, tags, Reference, then — after a divider band — Zotero Notes, a magenta highlight with page, link and comment, and the My Notes heading. Two screens joined; the abstract between them is skipped | Sync your library into notes |
-| `04-configure-sync.png` | The Configure sync dialog, a collection and a tag ticked | Choose what to sync |
+| `desktop-00-zotero-menu.png` | `/zotero` on desktop: Insert citation under INSERT, the other four under DISPLAY AND GLOBAL ACTIONS | Where the actions live |
+| `desktop-01-test-connection.png` | The "Connected as …" alert, username and user ID blanked out | Set up |
+| `desktop-02-citation-picker.png` | Results for "zotero": the reference list open, two items | Cite as you write |
+| `desktop-03-synced-item-note.png` | The qLDPC item note: title, tags, Reference, then — after a divider band — Tags, Zotero Notes, the magenta highlight with page, link and comment, and My Notes. Two screens joined; the abstract between them is skipped | Sync your library into notes |
+| `desktop-04-configure-sync.png` | The Configure sync dialog, a collection and a tag ticked | Choose what to sync |
 
-The Configure sync shot was taken without submitting — the boxes were ticked for the
-picture and the dialog closed, so the real filter is unchanged. All four are mobile;
-the listing has no desktop shot yet.
+**Phone** — the Android app (Samsung SM-N986U) over adb, status bar cut off.
+
+| File | Shows |
+|---|---|
+| `01-test-connection.png` | The same alert, username and user ID blanked out |
+| `02-citation-picker.png` | The reference list as a bottom sheet, two items |
+| `03-synced-item-note.png` | The same item note, two screens joined |
+| `04-configure-sync.png` | Configure sync, a collection and a tag ticked |
+
+Neither Configure sync shot was submitted — the boxes were ticked for the picture and
+the dialog cancelled, so the real filter is unchanged. Both item-note shots still show
+a test comment on the highlight ("Testing comment for page 1…"); retake after editing
+it in Zotero if the listing should look clean.

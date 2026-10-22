@@ -240,6 +240,7 @@ instead of embedding it.
 | `04-configure-sync.png` | Configure sync, a collection and a tag ticked |
 
 Neither Configure sync shot was submitted — the boxes were ticked for the picture and
-the dialog cancelled, so the real filter is unchanged. Both item-note shots still show
-a test comment on the highlight ("Testing comment for page 1…"); retake after editing
-it in Zotero if the listing should look clean.
+the dialog cancelled, so the real filter is unchanged. Both item-note shots were retaken
+2026-10-22 after the highlight's test comment was replaced in Zotero ("Core idea: one
+framework for Pauli, Clifford and non-Clifford gates.") and a test line removed from My
+Notes; the phone one now ends after the highlight. Both are swapped into the plugin note.

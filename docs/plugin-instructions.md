@@ -173,6 +173,20 @@ Sync now, Configure sync and Test connection work the same as on desktop. In the
 plugin settings, the keyboard can cover the field you tapped; scroll the page up to see
 it.
 
+On a phone, the citation results open as a list at the bottom of the screen:
+
+[Screenshot: 02-citation-picker]
+
+Configure sync is one long list of checkboxes; scroll to the bottom for Submit:
+
+[Screenshot: 04-configure-sync]
+
+Test connection, and a synced item note, on the phone:
+
+[Screenshot: 01-test-connection]
+
+[Screenshot: 03-synced-item-note]
+
 ### PDFs
 
 The plugin links to your PDFs; it doesn't copy them into Amplenote. Amplenote doesn't
@@ -194,8 +208,16 @@ text, separately from the file.
 ## Screenshot files
 
 Two sets, both captured 2026-10-11 against the real library and cropped to the content.
-The instructions cell uses the **desktop** set; the phone set is there if a mobile
-section ever wants pictures.
+The instructions cell uses the **desktop** set through the walkthrough and the **phone**
+set in "On mobile".
+
+**A table cell can't hold a table** — measured in a trial note, 2026-10-22: a nested
+table broke out of the cell and took everything after it into the note body. So when
+this goes into the cell, the citation-format table becomes a bullet list
+(`formatted — The in-text citation…`). Headings, lists, bold, inline code and code
+blocks all stay inside the cell. Images go in by deleting each marker and uploading at
+the caret; uploading over selected text turns the text into a link to the image
+instead of embedding it.
 
 **Desktop** — Amplenote web in Chrome. The editor column only, so the notes sidebar
 (other notes' titles) is never in frame.

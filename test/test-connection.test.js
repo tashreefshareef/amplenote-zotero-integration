@@ -66,4 +66,32 @@ describe("testConnection", () => {
 
     expect(app._calls.alerts[0]).toMatch(/15s/);
   });
+
+  describe("with a group library selected", () => {
+    const KEY = { userID: 1, username: "tashreef", access: { user: { library: true } } };
+
+    function mockFetch(...bodies) {
+      const fetchImpl = jest.fn();
+      for (const body of bodies) fetchImpl.mockResolvedValueOnce(fakeResponse({ body }));
+      jest.spyOn(globalThis, "fetch").mockImplementation(fetchImpl);
+    }
+
+    test("names a group the key belongs to", async () => {
+      const app = createMockApp({ settings: { "Zotero API key": "k", "Zotero library": "Group 30: DH" } });
+      mockFetch(KEY, [{ id: 30, data: { name: "Digital Humanities" } }]);
+
+      await testConnection(app);
+
+      expect(app._calls.alerts[0]).toMatch(/Library: group "Digital Humanities"\.$/);
+    });
+
+    test("a group outside the key's list is flagged as public-only, not as unreadable", async () => {
+      const app = createMockApp({ settings: { "Zotero API key": "k", "Zotero library": "30" } });
+      mockFetch(KEY, []);
+
+      await testConnection(app);
+
+      expect(app._calls.alerts[0]).toMatch(/group 30, which isn't one of your key's groups — it works only if the group is public\./);
+    });
+  });
 });

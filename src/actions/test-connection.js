@@ -22,13 +22,14 @@ export async function testConnection(app) {
       : "unknown";
     let libraryLine = "";
     if (library.type === "group") {
-      // A group name needs one more call; a key without access to the group fails here,
-      // which is exactly what this action should surface.
+      // The name comes from the key's own group list. A group missing from it can still
+      // be readable — confirmed live 2026-10-23: public group 30 imported fine with a key
+      // that isn't a member — so say what's known, not that access will fail.
       const groups = await client.listGroups();
       const group = groups.find((g) => g.id === library.id);
       libraryLine = group
         ? ` Library: ${describeLibrary(library, group.name)}.`
-        : ` Library: group ${library.id}, which this key can't read.`;
+        : ` Library: group ${library.id}, which isn't one of your key's groups — it works only if the group is public.`;
     }
     await app.alert(`Connected as ${username} (userID ${userID}). Access: ${scope}.${libraryLine}`);
   } catch (e) {

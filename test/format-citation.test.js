@@ -19,6 +19,16 @@ describe("stripHtmlToText", () => {
     );
   });
 
+  test("decodes numeric entities, as Zotero's CSL output writes its ampersand", () => {
+    // Verbatim from a live APA citation, 2026-10-23.
+    expect(stripHtmlToText("<span>(Smits &#38; Wevers, 2023)</span>")).toBe("(Smits & Wevers, 2023)");
+    expect(stripHtmlToText("caf&#xE9; &#8212; ok")).toBe("café — ok");
+  });
+
+  test("decodes a double-encoded entity only once", () => {
+    expect(stripHtmlToText("literal &amp;#38;")).toBe("literal &#38;");
+  });
+
   test("collapses whitespace left behind by stripped tags", () => {
     expect(stripHtmlToText("<span>A</span>   <span>B</span>")).toBe("A B");
   });

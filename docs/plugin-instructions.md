@@ -135,6 +135,8 @@ setting holds the result, but the dialog writes it in the form the plugin reads.
 
 The plugin reads **My Library** unless you pick a group. Run **Zotero: Choose library**
 and pick one of the groups your key can see; search, sync and import then all use it.
+A public group you don't belong to won't be in that list: type its number (from its
+zotero.org/groups address) into the **Zotero library** setting instead.
 Switch back the same way. Notes from each library stay as they are when you switch — a
 sync only updates the library it's set to. The first sync after a switch is a full one,
 and a sync selection made for the other library is cleared, since its collections and

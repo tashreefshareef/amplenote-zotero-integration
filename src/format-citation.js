@@ -1,5 +1,13 @@
+/**
+ * Zotero's CSL output writes `&` as a numeric `&#38;` — confirmed live 2026-10-23, an
+ * APA citation for a two-author item came back `(Smits &#38; Wevers, 2023)` and showed
+ * that way in the picker. Numeric entities decode first, so a double-encoded
+ * `&amp;#38;` comes out as the literal text `&#38;` it stands for, not `&`.
+ */
 function decodeEntities(text) {
   return text
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")

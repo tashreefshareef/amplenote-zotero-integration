@@ -521,6 +521,56 @@ usually means."* — no mention of the API key.
 
 **Pass C is live-verified, and with it all three parity passes.**
 
+## Gap-closing pass — live-verified, 2026-10-23
+
+Four features taken from comparing against another Amplenote Zotero plugin
+(krishnakanthb13/anp-25-zotero): `Zotero: Import item`, group libraries (`Zotero: Choose
+library` + the `Zotero library` setting), a `bibtex` citation format with DOI/publication
+template fields, and the first-run key prompt (`src/setup.js`). Run in Amplenote web
+(Chrome), desktop, against the real library and public group 30 ("Digital Humanities").
+The new build went in by hand paste and was checked byte-for-byte against
+`dist/plugin-paste.js` (see api-notes.md, Plugin Builder entry of 2026-10-23, for why).
+
+| Check | Result |
+|---|---|
+| `/zotero` lists seven actions, incl. Import item and Choose library | ✅ after a reload |
+| Test connection, My Library | ✅ "Connected as … Access: library, files, notes." |
+| Insert citation, format setting `bibtex` | ✅ entry inserted at the cursor, re-keyed to `sahayComputingQLDPCCodes2026` — the same key `[@…]` gives. Lands as **one paragraph** with its line breaks and tabs kept, not a code block (insertText is text, api-notes.md #11) |
+| Search citation, `bibtex` | ✅ appended as a real `language-bibtex` code block |
+| Import item, item already synced | ✅ "Updated the note…", same note, no duplicate; Reference rewritten with the new `{{doiLink}}` (a working doi.org link) and `{{itemType}}`; My Notes and a user-added `## Scratch` section untouched; navigated to the note |
+| Import item, group 30 | ✅ new note created and opened — `app.navigate` to its `local-…` uuid works; "View in Zotero" points at zotero.org/groups/…; sync state entry carries `"library": "group:30"`; `libraryVersion` unchanged (52) |
+| Test connection, group not among the key's groups | ✅ after a wording fix — the first build said "which this key can't read", false for a public group |
+| Choose library, key with no groups | ✅ "Your key can only see My Library…" |
+| Sync now, My Library, after the group import | ✅ "0 new, 0 updated, 4 highlights refreshed." — the four My Library notes, the group note skipped, no failure; state `library: "user"`, group entry kept |
+
+Found and fixed during the run:
+
+- **`&#38;` in citations.** Zotero's CSL output writes `&` as a numeric entity; the
+  decoder only knew named ones, so `(Smits &#38; Wevers, 2023)` showed in the picker —
+  and would have gone into notes the same way. `format-citation.js` now decodes numeric
+  entities. Re-checked live: the picker shows `(Smits & Wevers, 2023)`. See bugs-found.md.
+- **`{{publication}}` blank for a preprint.** A preprint keeps arXiv in `repository`, its
+  type's name for the publisher field; `{{publisher}}` now reads it.
+- **An extra `/keys/current` round trip** in Test connection with a group selected —
+  `keysCurrent` now caches the userID it returns.
+
+Not verified live:
+
+- **The first-run key prompt.** Testing it means deleting the saved key and pasting it
+  back, which was left to the account owner. Unit tests only (`test/setup.test.js`).
+- **The Choose library picker and its filter-clearing.** The account's key belongs to no
+  group, so the list of groups never appeared. Group *reading* was verified through the
+  hand-typed `30`.
+- **A group's `zotero://open-pdf/groups/…` link** — group 30's imported item had no PDF.
+- **Mobile.** None of the four was run on the phone.
+
+Seen twice, not reproduced: Import item's results list opened **empty** — no options in
+the DOM at all — for "higher education risk" and "digital humanities" in group 30. The
+labels were suspected (both lists had Chinese text) and ruled out one by one: a lone
+Chinese label, a full-width colon, `&#38;`, and two results all rendered; the original
+"higher education risk" search then rendered normally too. Cancelling and searching
+again is the workaround if it recurs. Recorded in api-notes.md.
+
 ## Layout templates — live-verified, 2026-09-21
 
 The Obsidian reference plugin's templating, by outcome. Two optional settings; leave

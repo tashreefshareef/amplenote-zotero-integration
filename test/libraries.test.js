@@ -77,6 +77,8 @@ describe("createZoteroClient — publication fields", () => {
               data: { itemType: "journalArticle", title: "A", DOI: "10.1/a", publicationTitle: "Nature", volume: "5", issue: "2", pages: "1-9", url: "https://x.org/a" },
             },
             { key: "B", data: { itemType: "bookSection", title: "B", bookTitle: "Handbook", publisher: "MIT Press", extra: "Some note\nDOI: 10.2/b" } },
+            // Shape of the live qLDPC item, 2026-10-23: no container title, arXiv in `repository`.
+            { key: "C", data: { itemType: "preprint", title: "C", repository: "arXiv", DOI: "10.48550/arXiv.2609.02999" } },
           ],
         })
       );
@@ -94,6 +96,7 @@ describe("createZoteroClient — publication fields", () => {
       itemType: "journalArticle",
     });
     expect(items[1]).toMatchObject({ doi: "10.2/b", publication: "Handbook", publisher: "MIT Press" });
+    expect(items[2]).toMatchObject({ publication: "", publisher: "arXiv", itemType: "preprint" });
   });
 });
 

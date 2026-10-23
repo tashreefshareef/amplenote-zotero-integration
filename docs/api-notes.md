@@ -1220,6 +1220,24 @@ which can't show a long code block whole. **After any hand paste, check the plug
 for the error badge before testing anything** — a missing action looks like a
 plugin bug when it is an install failure.
 
+**A hand paste that works, and how to prove it landed.** 2026-10-23 (Zotero
+integration), desktop Chrome: put `dist/plugin-paste.js` on the OS clipboard, click
+inside the plugin's code block, Ctrl+A, Ctrl+V. **Ctrl+A inside a CodeMirror block
+selects that block only**, not the note — but the click has to land in the *right*
+block: `document.querySelector('.ProseMirror .code-block')` found a template example
+inside the instructions table cell first; the plugin's block is the note's **last
+top-level child**. The DOM only renders part of a long block (126 of ~26,000 characters
+were in `innerText`), so DOM text can't confirm the paste. The editor state can:
+`block.querySelector('.cm-content').cmView.view.state.doc.toString()` returns the whole
+code — compare its length and a checksum with the file. The pasted code was live after a
+page reload, with no reinstall.
+
+**The table toolbar button converts the table to text.** With the cursor in a metadata
+table cell, the toolbar's table icon does not open a row/column menu — it turns the whole
+table into `setting|Zotero API key` lines, which unregisters every setting. Ctrl+Z
+restored it intact. To add a row, put the cursor at the end of the table's **last** cell
+and press Tab: that appends an empty row (confirmed 2026-10-23).
+
 ## Still unverified
 
 | Question | Why it matters | How to resolve |
@@ -1266,3 +1284,26 @@ mock that drifts from reality makes green tests meaningless.
   genuinely scoped to that plugin — Account Settings → Plugins → [name] → Settings shows
   only that plugin's own declared settings, never another installed plugin's, even when
   two plugins are installed on the same account with differently-named settings rows.
+- **2026-10-23** — Zotero integration, desktop Chrome. Five findings from one live run:
+  - **Plugin Builder can report success without changing the code.** "Plugin refresh …
+    succeeded" appeared twice, minutes apart, while the code block still held the previous
+    build — confirmed by its own text (four app actions, not six) and by the actions list.
+    Raw GitHub was already serving the new file to `curl`. Cause not pinned down (the
+    stale-cache note under "Syncing via Plugin Builder" in development.md is the likely
+    one). **Don't take the success alert as proof**: check the code block (see "Editing
+    the plugin code block…") or the `/` actions list after a reload.
+  - **`app.navigate` to a just-created `local-…` uuid works.** `createNote`'s uuid is not
+    durable (it is swapped for a permanent one later — development.md, Phase 3), but
+    navigating to it immediately opened the right note.
+  - **A multi-line `insertText` return keeps its line breaks.** A BibTeX entry came back
+    as ONE paragraph with its `\n`s and tabs shown as typed — readable, not parsed as
+    markdown (no code block). Extends #11.
+  - **An `app.prompt` `select` rendered empty twice, then fine.** No options in the DOM,
+    clicking and arrow keys did nothing, no console error; the same search later rendered
+    normally. Label content was ruled out (CJK, full-width punctuation, `&#38;`, one vs.
+    two options all fine). Unexplained — if a picker comes up empty, cancel and retry
+    before debugging the plugin.
+  - **A slash command runs from mid-line too, and leaves its text there.** Clicking at a
+    fixed coordinate put the caret inside an existing line; `/zotero import` was typed
+    into it, the action ran, and the typed text stayed behind in the line. Put the caret
+    on an empty line (check `getSelection()`) before typing a slash command.

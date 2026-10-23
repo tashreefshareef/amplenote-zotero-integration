@@ -1557,3 +1557,26 @@ searchability:
 | Reuse a library's own stylesheet for anything whose geometry that library computes (here: PDF.js's text layer), rather than hand-rolling the positioning CSS. Two separate bugs came from reimplementing it. | api-notes.md § "TEXT LAYER" comment in `src/embed/html.js` |
 | A literal color value copied out of one theme is not the same as a semantic reference to it - if the platform offers a named/indexed color alongside a raw hex, the named one is the one that stays correct in a theme you didn't test in. A fixed inline `background-color` looked fine in light mode and went unreadable in dark mode, because the platform's own color-index mechanism repaints per-theme and the literal hex bypasses that. Test any color decision in every theme the app supports, not just the one open while developing. | api-notes.md § finding 8 "UPDATE - the underline turned out to be the cheaper cost" |
 | A canvas-driven render loop (`requestAnimationFrame`) silently stalls in a hidden/non-compositing tab — looks exactly like a hang, nothing wrong in your own code. | api-notes.md § "PDF.js stalls in a hidden tab" |
+
+---
+
+## A citation showed `&#38;` where it should have said `&`
+
+**Symptom:** a two-author APA citation from Zotero appeared in the citation picker as
+`(Smits &#38; Wevers, 2023)`. Every earlier test citation had one author or "et al.", so
+no ampersand had ever come through.
+
+**Cause:** the HTML-to-text helper decoded a hand-picked list of *named* entities
+(`&amp;`, `&lt;`, `&quot;`, …). Zotero's CSL renderer writes the ampersand as the
+*numeric* entity `&#38;`, which no entry in the list matched.
+
+**Fix:** decode `&#NNN;` and `&#xHH;` generically with `String.fromCodePoint`, before
+`&amp;`, so a double-encoded `&amp;#38;` comes out as the literal text `&#38;` rather than
+being decoded twice (`src/format-citation.js`, with tests for both).
+
+**General lesson:** an entity decoder written as a list of the entities you've seen is a
+decoder for your test data. HTML has two spellings for every character (named and
+numeric), and serializers pick freely — often numeric for `&`, `<` and quotes. Either use
+the platform's decoder (`DOMParser`, a `textarea`) where one exists, or handle the
+numeric forms generically. And order matters: decoding `&amp;` first turns `&amp;#38;`
+into `&#38;` and then into `&`, corrupting text that meant a literal entity.

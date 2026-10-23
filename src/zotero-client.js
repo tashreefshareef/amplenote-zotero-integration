@@ -57,7 +57,8 @@ function publicationFields(data) {
     volume: data.volume || "",
     issue: data.issue || "",
     pages: data.pages || "",
-    publisher: data.publisher || data.university || data.institution || "",
+    // A preprint's arXiv/bioRxiv is `repository` — its type's name for the publisher field.
+    publisher: data.publisher || data.repository || data.university || data.institution || "",
     sourceUrl: data.url || "",
   };
 }
@@ -213,9 +214,12 @@ export function createZoteroClient({
     return { items, lastModifiedVersion };
   }
 
-  /** `/keys/current` — confirms the key is valid and returns its userID. */
+  /** `/keys/current` — confirms the key is valid and returns its userID, which it also
+   * caches so a later call that needs the userID doesn't ask again (Test connection
+   * followed by listGroups, with a group selected). */
   async function keysCurrent() {
     const res = await request("/keys/current");
+    if (cachedUserID === null && res.data?.userID !== undefined) cachedUserID = res.data.userID;
     return res.data;
   }
 

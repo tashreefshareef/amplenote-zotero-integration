@@ -271,3 +271,20 @@ the dialog cancelled, so the real filter is unchanged. Both item-note shots were
 2026-10-22 after the highlight's test comment was replaced in Zotero ("Core idea: one
 framework for Pauli, Clifford and non-Clifford gates.") and a test line removed from My
 Notes; the phone one now ends after the highlight. Both are swapped into the plugin note.
+
+**Cell updated 2026-10-23** for Import item, group libraries, BibTeX, the DOI fields and
+the first-run key prompt — edited in place, block by block, so the nine images were never
+re-uploaded. Checked after a reload: every changed passage present, no old wording left,
+9 images, 11 table rows, code block still byte-for-byte `dist/plugin-paste.js`. Two
+screenshots now lag the text: `desktop-00-zotero-menu` still shows five actions (seven
+now), and `desktop-01-test-connection` shows the settings-page route rather than the
+first-run prompt. Neither is wrong about what it shows; retake them when convenient.
+
+How the in-place edit was done, for next time: select the block's text through the DOM,
+put the replacement on the clipboard as **HTML** (`<b>`/`<code>` survive the paste), and
+Ctrl+V. In a table cell, **Enter at the end of a paragraph jumps to the next row's cell**
+instead of adding a line (inside a list it adds an item, as usual), so a new block is
+added by pasting `<p></p>` + the new blocks at the end of the block before it — the empty
+paragraph merges into that block and the rest land after it. Windows PowerShell 5.1's
+`Set-Clipboard -AsHtml` miscounts the CF_HTML offsets for non-ASCII text and Chrome then
+pastes nothing; build the CF_HTML header with UTF-8 byte offsets instead.

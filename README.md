@@ -10,6 +10,9 @@ what you wrote in them.
 It works with your **online** Zotero library, so Zotero desktop doesn't need to be
 running.
 
+Install it from
+**[its plugin page](https://www.amplenote.com/plugins/2vv8Fj5VhKuuLEGmnVv3K4mA)**.
+
 ![A synced item note: reference, tags, Zotero notes, a highlight with its page and link, and My Notes](docs/screenshots/desktop-03-synced-item-note.png)
 
 ## What it does
@@ -117,8 +120,10 @@ the repo layout, the testing approach, and how each feature was verified in the 
 
 ### Getting your own build into Amplenote
 
-This section is for running a build of your own: a fork, a local change, or a fix in
-progress.
+To *use* the plugin, install it from
+[its plugin page](https://www.amplenote.com/plugins/2vv8Fj5VhKuuLEGmnVv3K4mA) — there is
+nothing here you need. This section is for running a build of your own: a fork, a local
+change, or a fix in progress.
 
 **Sync from GitHub.** Install the
 [Plugin Builder](https://github.com/alloy-org/plugin-builder) plugin, then in your

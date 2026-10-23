@@ -286,6 +286,16 @@ selecting the old image (a click selects it as a node) and pasting the PNG from 
 clipboard; Amplenote uploads a pasted image itself. Re-checked after a reload: 400 px
 shown, still 9 images, code block unchanged.
 
+**All nine capped at 400 px wide, 2026-10-23**, by the same select-and-paste swap. The
+files here were overwritten with the 400 px versions (originals in git history):
+desktop-01 560→400×131, desktop-02 560→400×209, desktop-03 732→400×357, desktop-04
+560→400×441, and the phone shots 1440→400 (01 ×186, 02 ×600, 03 ×842, 04 ×556). After a
+reload all nine read 400 px wide and are hosted on images.amplenote.com; text, rows and
+code block unchanged. The phone shots already *displayed* at 400 px, so they look the
+same and just load lighter. Trade-off: `desktop-03-synced-item-note` is a whole note
+shrunk to 400 px, so its body text is small; a tighter crop would read better at this
+width.
+
 How the in-place edit was done, for next time: select the block's text through the DOM,
 put the replacement on the clipboard as **HTML** (`<b>`/`<code>` survive the paste), and
 Ctrl+V. In a table cell, **Enter at the end of a paragraph jumps to the next row's cell**

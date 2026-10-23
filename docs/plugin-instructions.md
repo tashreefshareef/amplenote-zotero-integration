@@ -228,6 +228,8 @@ text, separately from the file.
 - **An action is missing from the list** — open the plugin's own note. A red "Plugin
   error" badge there means Amplenote couldn't load the plugin; reinstall it.
 
+Source code on GitHub: https://github.com/tashreefshareef/amplenote-zotero-integration
+
 ---
 
 ## Screenshot files

@@ -33,17 +33,20 @@ sign in to Zotero.
    - Tick **Allow library access** and **Allow notes access**.
    - Leave **Allow write access** off. The plugin only reads from Zotero, and a read-only
      key is the safe choice: the key shows in plain text on the plugin's settings page.
-2. In Amplenote, open **Settings → Plugins → Zotero Integration**, and paste the key into
-   **Zotero API key**. Click **Save settings**.
-3. Run **Zotero: Test connection** (below for where to find it). It should answer with
-   your Zotero username. If it says the key was rejected, check it was copied whole.
+   - To use a **group** library, also give the key read access to that group (or to all
+     groups).
+2. Run **Zotero: Test connection** (below for where to find it). The first time, it asks
+   for your key: paste it in. The plugin checks it with Zotero, saves it, and answers
+   with your Zotero username. If it says the key was rejected, check it was copied whole.
+   (You can also paste the key into **Settings → Plugins → Zotero Integration → Zotero
+   API key** yourself. Any action asks for it if it isn't there yet.)
 
 [Screenshot: desktop-01-test-connection]
 
-**Where the actions live.** On desktop, type `/zotero` in any note: all five actions are
-listed. On a phone, `/zotero` lists only **Insert citation**; for the other four — Test
-connection, Search citation, Sync now, Configure sync — tap the **search icon** and type
-`zotero`.
+**Where the actions live.** On desktop, type `/zotero` in any note: all seven actions are
+listed. On a phone, `/zotero` lists only **Insert citation**; for the other six — Test
+connection, Search citation, Sync now, Import item, Configure sync, Choose library — tap
+the **search icon** and type `zotero`.
 
 [Screenshot: desktop-00-zotero-menu]
 
@@ -64,6 +67,11 @@ It asks which format you want each time, unless you set one:
 | `pandoc` | `[@kahneman2011]` |
 | `latex` | `\cite{kahneman2011}` |
 | `biblatex` | `\autocite{kahneman2011}` |
+| `bibtex` | The full BibTeX entry, `@book{kahneman2011, …}` |
+
+The BibTeX entry comes from Zotero itself and uses the same cite key as the other
+formats, so `[@kahneman2011]` in your text matches the entry. With **Search citation**
+it's added as a code block.
 
 To skip the question, put one of those words in the **Zotero citation format** setting.
 The citation style is **Chicago** unless you set **Zotero citation style** to another
@@ -80,8 +88,8 @@ see "On mobile".
 Run **Zotero: Sync now**. Each Zotero item becomes its own Amplenote note, named after
 the item and tagged with its Zotero tags, laid out in four sections:
 
-- **Reference** — the formatted reference, abstract, and links to the item and its
-  attachments on zotero.org.
+- **Reference** — the formatted reference, abstract, a DOI (or source) link, and links
+  to the item and its attachments on zotero.org.
 - **Zotero Notes** — the notes you wrote on the item in Zotero.
 - **Highlights & Notes** — every highlight, underline and note from Zotero's PDF reader,
   with its color, page, and comment.
@@ -103,6 +111,11 @@ What a re-sync changes, and what it leaves alone:
 - **Deleting an item in Zotero doesn't delete its note.** The note just stops being
   updated.
 
+**Just one item?** Run **Zotero: Import item**, search, and pick the reference. It gets
+the same note a sync would give it, without syncing anything else, and the plugin opens
+it. Run it again on the same item to update that note. From then on, Sync now keeps its
+highlights current too.
+
 A note called **Zotero Sync** holds the plugin's bookkeeping. Leave it alone — editing it
 can make the next sync redo everything or skip items.
 
@@ -118,6 +131,15 @@ one, so newly included items come across.
 Use Configure sync rather than typing into the **Zotero sync filter** setting — the
 setting holds the result, but the dialog writes it in the form the plugin reads.
 
+### Group libraries
+
+The plugin reads **My Library** unless you pick a group. Run **Zotero: Choose library**
+and pick one of the groups your key can see; search, sync and import then all use it.
+Switch back the same way. Notes from each library stay as they are when you switch — a
+sync only updates the library it's set to. The first sync after a switch is a full one,
+and a sync selection made for the other library is cleared, since its collections and
+tags belong to that library.
+
 ### Shape your notes with templates (optional)
 
 Two optional settings change what goes inside a section. Leave them blank for the
@@ -131,7 +153,8 @@ field doesn't accept the Enter key. Any `{{name}}` from these lists is filled in
 
 - Reference: `{{title}}` `{{authors}}` `{{date}}` `{{bibliography}}` `{{citation}}`
   `{{abstract}}` `{{tags}}` `{{citeKey}}` `{{itemKey}}` `{{zoteroLink}}` `{{zoteroUrl}}`
-  `{{attachmentLinks}}`
+  `{{attachmentLinks}}` `{{doi}}` `{{doiLink}}` `{{doiUrl}}` `{{publication}}`
+  `{{volume}}` `{{issue}}` `{{pages}}` `{{publisher}}` `{{url}}` `{{itemType}}`
 - Highlight: `{{text}}` `{{comment}}` `{{color}}` `{{page}}` `{{type}}` `{{link}}`
   `{{linkUrl}}`
 
@@ -196,8 +219,8 @@ text, separately from the file.
 
 ### If something goes wrong
 
-- **"Rejected the API key"** — the key is wrong, revoked, or lacks library access.
-  Make a new one (Set up, step 1).
+- **"Rejected the API key"** — the key is wrong, revoked, or lacks library access — or,
+  with a group picked, lacks access to that group. Make a new one (Set up, step 1).
 - **"Is … a valid Zotero style id"** — the citation style setting isn't a style Zotero
   knows. Clear it to go back to Chicago.
 - **An action is missing from the list** — open the plugin's own note. A red "Plugin

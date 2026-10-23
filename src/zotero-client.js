@@ -35,6 +35,30 @@ function mapSyncItem(item) {
     citationKey: item.data?.citationKey || "",
     creators: item.data?.creators || [],
     date: item.data?.date || "",
+    ...publicationFields(item.data || {}),
+  };
+}
+
+/**
+ * Where an item was published, for the reference template. Zotero names the container
+ * field differently per item type (a journal article's publicationTitle is a chapter's
+ * bookTitle, a paper's proceedingsTitle), so take whichever one this type has. DOI is a
+ * real field only on some types; the others carry it as a `DOI: …` line in Extra, which
+ * is where Zotero itself puts it when importing one.
+ */
+function publicationFields(data) {
+  const doi = data.DOI || ((data.extra || "").match(/^DOI:\s*(\S+)/im) || [])[1] || "";
+  return {
+    itemType: data.itemType || "",
+    doi,
+    publication:
+      data.publicationTitle || data.bookTitle || data.proceedingsTitle || data.websiteTitle ||
+      data.blogTitle || data.forumTitle || data.programTitle || "",
+    volume: data.volume || "",
+    issue: data.issue || "",
+    pages: data.pages || "",
+    publisher: data.publisher || data.university || data.institution || "",
+    sourceUrl: data.url || "",
   };
 }
 
@@ -99,9 +123,14 @@ export function parseLinkHeader(linkHeader) {
 
 const defaultSleep = (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 
+/**
+ * `groupID` points every library-scoped call at that group (`/groups/<id>/…`) instead of
+ * the key owner's own library (`/users/<userID>/…`) — same endpoints, same envelopes.
+ */
 export function createZoteroClient({
   apiKey,
   userID,
+  groupID,
   fetchImpl = typeof fetch === "function" ? fetch : undefined,
   sleepImpl = defaultSleep,
 } = {}) {
@@ -210,6 +239,20 @@ export function createZoteroClient({
     return pendingUserID;
   }
 
+  /** A group needs no userID, so it costs no /keys/current round trip. */
+  async function libraryPath() {
+    if (groupID) return `/groups/${groupID}`;
+    return `/users/${await resolveUserID()}`;
+  }
+
+  /** The groups this key can read — what "Zotero: Choose library" offers. Always the
+   * key owner's list, whichever library is currently selected. */
+  async function listGroups() {
+    const uid = await resolveUserID();
+    const { items } = await paginate(`/users/${uid}/groups`);
+    return items.map((g) => ({ id: g.id, name: g.data?.name || `Group ${g.id}` }));
+  }
+
   /**
    * Top-level items (excludes child notes/attachments — those aren't citable on their
    * own) matching a quick-search query, with a formatted citation and bibliography
@@ -217,8 +260,8 @@ export function createZoteroClient({
    * Zotero's default quick-search mode: title, creator and year only, not full text.
    */
   async function searchItems({ query, style = DEFAULT_CITATION_STYLE, limit = 25 } = {}) {
-    const uid = await resolveUserID();
-    const res = await request(`/users/${uid}/items/top`, {
+    const lib = await libraryPath();
+    const res = await request(`${lib}/items/top`, {
       params: {
         q: query,
         qmode: "titleCreatorYear",
@@ -256,8 +299,8 @@ export function createZoteroClient({
    * touched by future syncs.
    */
   async function syncItems({ sinceVersion, style = DEFAULT_CITATION_STYLE, pageSize = 50 } = {}) {
-    const uid = await resolveUserID();
-    const { items, lastModifiedVersion } = await paginate(`/users/${uid}/items/top`, {
+    const lib = await libraryPath();
+    const { items, lastModifiedVersion } = await paginate(`${lib}/items/top`, {
       params: { itemType: "-attachment", include: "data,citation,bib", style },
       sinceVersion,
       pageSize,
@@ -268,16 +311,16 @@ export function createZoteroClient({
   /** Zotero collections, for Phase 5's config picker and collection-scoped sync below.
    * Collections have a stable `key`, unlike tags — see `listTags`. */
   async function listCollections() {
-    const uid = await resolveUserID();
-    const { items } = await paginate(`/users/${uid}/collections`, { params: { include: "data" } });
+    const lib = await libraryPath();
+    const { items } = await paginate(`${lib}/collections`, { params: { include: "data" } });
     return items.map((c) => ({ key: c.key, name: c.data?.name || "(untitled collection)" }));
   }
 
   /** Every tag name used anywhere in the library. Zotero has no separate tag id/key —
    * a tag IS its name, which is also what `syncFilteredItems`'s `tag=` filter takes. */
   async function listTags() {
-    const uid = await resolveUserID();
-    const { items } = await paginate(`/users/${uid}/tags`);
+    const lib = await libraryPath();
+    const { items } = await paginate(`${lib}/tags`);
     return [...new Set(items.map((t) => t.tag).filter(Boolean))].sort();
   }
 
@@ -322,7 +365,7 @@ export function createZoteroClient({
     style = DEFAULT_CITATION_STYLE,
     pageSize = 50,
   } = {}) {
-    const uid = await resolveUserID();
+    const lib = await libraryPath();
     const baseParams = { itemType: "-attachment", include: "data,citation,bib", style };
 
     const byKey = new Map();
@@ -336,13 +379,13 @@ export function createZoteroClient({
     };
 
     for (const key of collectionKeys) {
-      await mergeIn(`/users/${uid}/collections/${key}/items/top`, baseParams);
+      await mergeIn(`${lib}/collections/${key}/items/top`, baseParams);
     }
     if (tagNames.length) {
-      await mergeIn(`/users/${uid}/items/top`, { ...baseParams, tag: tagNames.join(" || ") });
+      await mergeIn(`${lib}/items/top`, { ...baseParams, tag: tagNames.join(" || ") });
     }
     if (itemTypes.length) {
-      await mergeIn(`/users/${uid}/items/top`, { include: "data,citation,bib", style, itemType: itemTypes.join(" || ") });
+      await mergeIn(`${lib}/items/top`, { include: "data,citation,bib", style, itemType: itemTypes.join(" || ") });
     }
 
     return { lastModifiedVersion, items: [...byKey.values()].map(mapSyncItem) };
@@ -351,8 +394,8 @@ export function createZoteroClient({
   /** One item's direct children (attachments, standalone notes) — `include: "data"` is
    * enough here; no citation/bib needed for a child item. */
   async function getChildren(itemKey) {
-    const uid = await resolveUserID();
-    const { items } = await paginate(`/users/${uid}/items/${itemKey}/children`, {
+    const lib = await libraryPath();
+    const { items } = await paginate(`${lib}/items/${itemKey}/children`, {
       params: { include: "data" },
     });
     return items;
@@ -391,6 +434,8 @@ export function createZoteroClient({
         annotations.push({
           key: a.key,
           attachmentKey: attachment.key,
+          // zotero://open-pdf names a group's items differently from My Library's.
+          groupID: groupID ?? null,
           type: a.data.annotationType || "",
           text: a.data.annotationText || "",
           comment: a.data.annotationComment || "",
@@ -429,9 +474,28 @@ export function createZoteroClient({
    * anything going wrong on the Amplenote note-lookup side.
    */
   async function getItem(itemKey) {
-    const uid = await resolveUserID();
-    const res = await request(`/users/${uid}/items/${itemKey}`, { params: { include: "data" } });
+    const lib = await libraryPath();
+    const res = await request(`${lib}/items/${itemKey}`, { params: { include: "data" } });
     return { title: res.data?.data?.title || "(untitled)" };
+  }
+
+  /** One item in `syncItems`' shape — what "Zotero: Import item" syncs after a search. */
+  async function getSyncItem(itemKey, { style = DEFAULT_CITATION_STYLE } = {}) {
+    const lib = await libraryPath();
+    const res = await request(`${lib}/items/${itemKey}`, { params: { include: "data,citation,bib", style } });
+    return mapSyncItem(res.data);
+  }
+
+  /**
+   * The item's BibTeX entry, rendered by Zotero's own exporter. `include=bibtex` on the
+   * normal JSON response, confirmed live 2026-10-23 against a public group: the entry
+   * comes back as a string field, so this needs no non-JSON response path. Fetched on
+   * demand rather than added to every search, which would render it for all 25 results.
+   */
+  async function getBibtex(itemKey) {
+    const lib = await libraryPath();
+    const res = await request(`${lib}/items/${itemKey}`, { params: { include: "bibtex" } });
+    return (res.data?.bibtex || "").trim();
   }
 
   return {
@@ -442,6 +506,9 @@ export function createZoteroClient({
     syncItems,
     getItemExtras,
     getItem,
+    getSyncItem,
+    getBibtex,
+    listGroups,
     listCollections,
     listTags,
     listItemTypes,

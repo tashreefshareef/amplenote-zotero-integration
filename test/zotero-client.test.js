@@ -332,6 +332,14 @@ describe("createZoteroClient#syncItems", () => {
         citationKey: "",
         creators: [],
         date: "",
+        itemType: "",
+        doi: "",
+        publication: "",
+        volume: "",
+        issue: "",
+        pages: "",
+        publisher: "",
+        sourceUrl: "",
       },
     ]);
   });

@@ -38,14 +38,15 @@ describe("configureSync", () => {
     jest.restoreAllMocks();
   });
 
-  test("alerts and makes no network call when no key is configured", async () => {
+  test("asks for the key and makes no network call when none is configured and the prompt is cancelled", async () => {
     const app = createMockApp();
     const fetchImpl = mockFetchSequence();
 
     await configureSync(app);
 
     expect(fetchImpl).not.toHaveBeenCalled();
-    expect(app._calls.alerts[0]).toMatch(/Zotero API key/i);
+    expect(app._calls.prompts[0].options.inputs[0]).toMatchObject({ label: "Zotero API key", type: "secureText" });
+    expect(app._calls.alerts).toEqual([]);
   });
 
   test("declares one checkbox input per collection/tag/category name, saves what's checked as human-readable text", async () => {

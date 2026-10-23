@@ -8,7 +8,13 @@ function extractJsonFence(sectionBody) {
 
 function renderStateBody(state) {
   const json = JSON.stringify(
-    { libraryVersion: state.libraryVersion, items: state.items, filterSignature: state.filterSignature },
+    {
+      libraryVersion: state.libraryVersion,
+      items: state.items,
+      filterSignature: state.filterSignature,
+      // Which library libraryVersion belongs to (library.js). Absent = My Library.
+      library: state.library,
+    },
     null,
     2
   );
@@ -59,6 +65,7 @@ export async function loadSyncState(app) {
     libraryVersion: parsed?.libraryVersion ?? null,
     items: parsed?.items ?? {},
     filterSignature: parsed?.filterSignature,
+    library: parsed?.library,
   };
 }
 

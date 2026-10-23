@@ -17,12 +17,15 @@ describe("testConnection", () => {
     jest.restoreAllMocks();
   });
 
-  test("alerts to set the key when none is configured", async () => {
+  test("asks for the key when none is configured, and stops quietly if that's cancelled", async () => {
     const app = createMockApp();
+    const fetchImpl = jest.spyOn(globalThis, "fetch");
 
     await testConnection(app);
 
-    expect(app._calls.alerts[0]).toMatch(/Zotero API key/i);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(app._calls.prompts[0].options.inputs[0]).toMatchObject({ label: "Zotero API key", type: "secureText" });
+    expect(app._calls.alerts).toEqual([]);
   });
 
   test("alerts a success message with userID and access scope on a valid key", async () => {

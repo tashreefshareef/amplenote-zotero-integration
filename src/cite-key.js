@@ -2,9 +2,11 @@
  * Citation output formats — the Obsidian reference plugin's `Format` set
  * (formatted-citation, formatted-bibliography, pandoc, latex, biblatex), minus its
  * free-form `template`. `formatted` and `bibliography` come straight from Zotero's
- * server-side CSL rendering (`include=citation,bib`); the other three need a cite key.
+ * server-side CSL rendering (`include=citation,bib`); the next three need a cite key.
+ * `bibtex` is the whole entry, from Zotero's exporter — the caller fetches it into
+ * `item.bibtex` first (zotero-client.js's getBibtex), since search doesn't carry it.
  */
-export const CITATION_FORMATS = ["formatted", "bibliography", "pandoc", "latex", "biblatex"];
+export const CITATION_FORMATS = ["formatted", "bibliography", "pandoc", "latex", "biblatex", "bibtex"];
 
 export function normalizeFormat(raw) {
   const f = (raw || "").trim().toLowerCase();
@@ -35,8 +37,20 @@ export function deriveCiteKey(item) {
   return `${namePart}${year}` || item.key;
 }
 
+/**
+ * Zotero's exporter keys an entry `zotero-item-<id>` unless the item has a Citation Key,
+ * which wouldn't match the `[@kahneman2011]` the pandoc/LaTeX formats insert for the
+ * same item. Re-key it to deriveCiteKey so every format agrees. When the item does have
+ * a Citation Key, deriveCiteKey returns exactly that, so this changes nothing.
+ */
+export function rekeyBibtex(entry, item) {
+  return (entry || "").replace(/^(\s*@\w+\s*\{)[^,]*,/, `$1${deriveCiteKey(item)},`);
+}
+
 export function formatCitation(item, format) {
   switch (normalizeFormat(format)) {
+    case "bibtex":
+      return rekeyBibtex(item.bibtex, item);
     case "bibliography":
       return item.bib || item.citation;
     case "pandoc":

@@ -1,12 +1,8 @@
-import {
-  SETTING_ZOTERO_API_KEY,
-  SETTING_ZOTERO_CITATION_STYLE,
-  SETTING_ZOTERO_CITATION_FORMAT,
-  DEFAULT_CITATION_STYLE,
-} from "../constants.js";
-import { createZoteroClient, describeZoteroError } from "../zotero-client.js";
+import { SETTING_ZOTERO_CITATION_STYLE, SETTING_ZOTERO_CITATION_FORMAT, DEFAULT_CITATION_STYLE } from "../constants.js";
+import { describeZoteroError } from "../zotero-client.js";
 import { truncateForLabel } from "../format-citation.js";
 import { CITATION_FORMATS, normalizeFormat, formatCitation } from "../cite-key.js";
+import { connect } from "../setup.js";
 
 // zotero-findings.md confirmed a `string` and a `select` input coexisting in ONE
 // app.prompt returns a positional array. It did not test a prompt with a SINGLE input —
@@ -26,37 +22,23 @@ function formatLabel(format, style) {
       return "LaTeX  \\cite{key}";
     case "biblatex":
       return "BibLaTeX  \\autocite{key}";
+    case "bibtex":
+      return "BibTeX entry  @article{key, ...}";
     default:
       return `Formatted citation (${style})`;
   }
 }
 
 /**
- * Search Zotero, let the user pick a result and an output format. Shared by the
- * insertText and appOption entry points below — they differ only in what happens to the
- * result, not in how it's found. Separate app.prompt calls, not one: the spike confirmed
- * a select's options render once, statically, at prompt time — there's no live
- * re-population from what's typed in a sibling field within a single prompt.
+ * The search box and the results list, shared by the citation picker and "Zotero:
+ * Import item". Separate app.prompt calls, not one: the spike confirmed a select's
+ * options render once, statically, at prompt time — there's no live re-population from
+ * what's typed in a sibling field within a single prompt.
  *
- * The citation STYLE (any CSL id Zotero's `style=` accepts) comes from a setting. The
- * FORMAT (cite-key.js's CITATION_FORMATS) comes from a setting when one is set — no
- * extra prompt — and is otherwise asked for in its own single-select prompt after the
- * reference is picked. Confirmed live, 2026-09-07: a prompt declaring TWO `select`
- * inputs rendered only the first (a `string` + a `select` together is fine — Phase 0
- * spike #4), so the format can't ride along in the results prompt as a second select.
- *
- * Returns the picked item plus `format` and `text` (the string to insert), or null.
+ * Returns the picked search result (searchItems' shape), or null when the user
+ * cancelled or nothing matched — the reason has already been shown.
  */
-export async function pickCitation(app) {
-  const apiKey = (app.settings[SETTING_ZOTERO_API_KEY] || "").trim();
-  if (!apiKey) {
-    await app.alert(`Set the "${SETTING_ZOTERO_API_KEY}" row in this plugin note's metadata table first.`);
-    return null;
-  }
-  const style = (app.settings[SETTING_ZOTERO_CITATION_STYLE] || "").trim() || DEFAULT_CITATION_STYLE;
-  const rawFormat = (app.settings[SETTING_ZOTERO_CITATION_FORMAT] || "").trim().toLowerCase();
-  const fixedFormat = CITATION_FORMATS.includes(rawFormat) ? rawFormat : null;
-
+export async function searchAndPick(app, client, style) {
   const queryResult = await app.prompt("Search Zotero", {
     inputs: [{ label: "Search", type: "string" }],
   });
@@ -64,7 +46,6 @@ export async function pickCitation(app) {
   const query = (firstValue(queryResult) || "").trim();
   if (!query) return null;
 
-  const client = createZoteroClient({ apiKey });
   let results;
   try {
     results = await client.searchItems({ query, style });
@@ -89,7 +70,32 @@ export async function pickCitation(app) {
     ],
   });
   if (pickResult === null) return null;
-  const item = results.find((r) => r.key === firstValue(pickResult));
+  return results.find((r) => r.key === firstValue(pickResult)) || null;
+}
+
+/**
+ * Search Zotero, let the user pick a result and an output format. Shared by the
+ * insertText and appOption entry points below — they differ only in what happens to the
+ * result, not in how it's found.
+ *
+ * The citation STYLE (any CSL id Zotero's `style=` accepts) comes from a setting. The
+ * FORMAT (cite-key.js's CITATION_FORMATS) comes from a setting when one is set — no
+ * extra prompt — and is otherwise asked for in its own single-select prompt after the
+ * reference is picked. Confirmed live, 2026-09-07: a prompt declaring TWO `select`
+ * inputs rendered only the first (a `string` + a `select` together is fine — Phase 0
+ * spike #4), so the format can't ride along in the results prompt as a second select.
+ *
+ * Returns the picked item plus `format` and `text` (the string to insert), or null.
+ */
+export async function pickCitation(app) {
+  const connection = await connect(app);
+  if (!connection) return null;
+  const { client } = connection;
+  const style = (app.settings[SETTING_ZOTERO_CITATION_STYLE] || "").trim() || DEFAULT_CITATION_STYLE;
+  const rawFormat = (app.settings[SETTING_ZOTERO_CITATION_FORMAT] || "").trim().toLowerCase();
+  const fixedFormat = CITATION_FORMATS.includes(rawFormat) ? rawFormat : null;
+
+  const item = await searchAndPick(app, client, style);
   if (!item) return null;
 
   let format = fixedFormat;
@@ -105,6 +111,19 @@ export async function pickCitation(app) {
     });
     if (formatResult === null) return null;
     format = normalizeFormat(firstValue(formatResult));
+  }
+
+  if (format === "bibtex") {
+    try {
+      item.bibtex = await client.getBibtex(item.key);
+    } catch (e) {
+      await app.alert(describeZoteroError(e));
+      return null;
+    }
+    if (!item.bibtex) {
+      await app.alert(`Zotero returned no BibTeX entry for "${item.title}".`);
+      return null;
+    }
   }
 
   return { ...item, format, text: formatCitation(item, format) };
@@ -144,6 +163,13 @@ export async function searchAndAppendCitation(app) {
   }
   const picked = await pickCitation(app);
   if (!picked) return;
+
+  // insertNoteContent parses markdown, so a BibTeX entry can go in as a real code block.
+  if (picked.format === "bibtex") {
+    await app.insertNoteContent({ uuid: noteUUID }, "```bibtex\n" + picked.text + "\n```\n", { atEnd: true });
+    await app.alert(`Appended the BibTeX entry for "${picked.title}".`);
+    return;
+  }
   await app.insertNoteContent({ uuid: noteUUID }, `${picked.text}\n`, { atEnd: true });
   await app.alert(`Appended: ${picked.text}`);
 }

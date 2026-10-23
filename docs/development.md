@@ -106,21 +106,27 @@ needs:
    | name | Zotero Integration |
    | setting | Zotero API key |
    | setting | Zotero sync filter |
+   | setting | Zotero library |
    | setting | Zotero citation style |
    | setting | Zotero citation format |
    | setting | Zotero reference template |
    | setting | Zotero highlight template |
 
-   Only **Zotero API key** is required. Every other row is optional and blank by
+   Only **Zotero API key** is needed, and since the first-run prompt (`src/setup.js`) a
+   user doesn't have to type it on the settings page: any action run without a key asks
+   for one, checks it, and saves it with `app.setSetting`. Every other row is optional and blank by
    default — but add them all anyway: `app.setSetting` writing to an undeclared label is
    unconfirmed to work (api-notes.md #9c only confirms the declared-row path).
 
    - **Zotero sync filter** — which collections/tags/categories to sync, written by
      `Zotero: Configure sync`. Blank = the whole library.
+   - **Zotero library** — which library every action reads, written by `Zotero: Choose
+     library` as `Group <id>: <name>`. Blank = the key owner's My Library. Only the
+     number is read back, so a hand-typed group id works too.
    - **Zotero citation style** — a CSL style id (`apa`, `ieee`, …). Blank =
      `chicago-note-bibliography`.
    - **Zotero citation format** — the citation picker's output: `formatted`,
-     `bibliography`, `pandoc`, `latex`, `biblatex`. Blank = ask each time.
+     `bibliography`, `pandoc`, `latex`, `biblatex`, `bibtex`. Blank = ask each time.
    - **Zotero reference template** / **Zotero highlight template** — custom layouts;
      blank = the built-in layout. See "Layout templates" at the end of this file.
 
@@ -567,6 +573,14 @@ want a line break.**
 | `{{zoteroLink}}` | `[View in Zotero](...)` link |
 | `{{zoteroUrl}}` | That link's bare URL |
 | `{{attachmentLinks}}` | One `[View "file.pdf" in Zotero](...)` line per attachment |
+| `{{doi}}` | DOI — the DOI field, or a `DOI: …` line in Extra for types without one |
+| `{{doiLink}}` | `[DOI: 10.…](https://doi.org/10.…)` |
+| `{{doiUrl}}` | That link's bare URL |
+| `{{publication}}` | Journal, book, proceedings or site title — whichever this item type has |
+| `{{volume}}` `{{issue}}` `{{pages}}` | As stored in Zotero |
+| `{{publisher}}` | Publisher (or university / institution for theses and reports) |
+| `{{url}}` | The URL the item was saved from — not its zotero.org page |
+| `{{itemType}}` | Zotero's item type id (`journalArticle`, `book`, …) |
 
 ### Highlight placeholders
 

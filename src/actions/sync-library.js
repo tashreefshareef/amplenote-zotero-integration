@@ -1,5 +1,4 @@
 import {
-  SETTING_ZOTERO_API_KEY,
   SETTING_ZOTERO_SYNC_FILTER,
   SETTING_ZOTERO_CITATION_STYLE,
   SETTING_REFERENCE_TEMPLATE,
@@ -10,7 +9,9 @@ import {
   HIGHLIGHTS_HEADING,
   MY_NOTES_HEADING,
 } from "../constants.js";
-import { createZoteroClient, describeZoteroError } from "../zotero-client.js";
+import { describeZoteroError } from "../zotero-client.js";
+import { connect } from "../setup.js";
+import { libraryStateKey } from "../library.js";
 import { loadSyncState, saveSyncState } from "../sync-state.js";
 import { writeSection, countHeadingOccurrences } from "../note-sections.js";
 import { parseFilterSetting, filterSignature } from "../sync-filter.js";
@@ -25,11 +26,15 @@ import { deriveCiteKey } from "../cite-key.js";
  * is 0-based, and the open-pdf scheme takes a 1-based page number, so this sends
  * `pageIndex + 1`. ⚠️ Unverified live on two counts: whether Amplenote keeps a
  * `zotero://` (non-http) link clickable, and whether the +1 lands on the right page.
+ *
+ * A group's item is `zotero://open-pdf/groups/<groupID>/items/<key>` — Zotero's own
+ * scheme for a non-personal library. ⚠️ Not yet clicked live in Zotero desktop.
  */
 function zoteroOpenUrl(a) {
   if (!a.attachmentKey) return "";
   const page = Number.isInteger(a.pageIndex) ? `?page=${a.pageIndex + 1}` : "";
-  return `zotero://open-pdf/library/items/${a.attachmentKey}${page}`;
+  const library = a.groupID ? `groups/${a.groupID}` : "library";
+  return `zotero://open-pdf/${library}/items/${a.attachmentKey}${page}`;
 }
 
 function zoteroOpenLink(a) {
@@ -132,7 +137,26 @@ function referenceValues(item, extras) {
     zoteroUrl: item.url || "",
     zoteroLink: item.url ? `[View in Zotero](${item.url})` : "",
     attachmentLinks,
+    itemType: item.itemType || "",
+    doi: item.doi || "",
+    doiUrl: doiUrl(item),
+    doiLink: sourceLink({ doi: item.doi }),
+    publication: item.publication || "",
+    volume: item.volume || "",
+    issue: item.issue || "",
+    pages: item.pages || "",
+    publisher: item.publisher || "",
+    url: item.sourceUrl || "",
   };
+}
+
+const doiUrl = (item) => (item.doi ? `https://doi.org/${item.doi}` : "");
+
+/** The paper itself, as a link: its DOI if it has one, else the URL Zotero saved it from. */
+function sourceLink(item) {
+  if (item.doi) return `[DOI: ${item.doi}](${doiUrl(item)})`;
+  if (item.sourceUrl) return `[Source](${item.sourceUrl})`;
+  return "";
 }
 
 function renderReference(item, extras, template) {
@@ -140,6 +164,8 @@ function renderReference(item, extras, template) {
 
   const lines = [item.bib || item.citation || item.title];
   if (item.abstract) lines.push("", item.abstract);
+  const source = sourceLink(item);
+  if (source) lines.push("", source);
   if (item.url) lines.push("", `[View in Zotero](${item.url})`);
   for (const att of extras.attachments) {
     if (att.url) lines.push("", `[View "${att.title}" in Zotero](${att.url})`);
@@ -216,6 +242,52 @@ async function isSectioned(app, uuid) {
 
 const sectionOpts = (label) => ({ headingLevel: "##", noteLabel: label });
 
+/** The reference and highlight templates; blank means the built-in layout (template.js). */
+export function readTemplates(app) {
+  return {
+    reference: app.settings[SETTING_REFERENCE_TEMPLATE] || "",
+    highlight: app.settings[SETTING_HIGHLIGHT_TEMPLATE] || "",
+  };
+}
+
+/**
+ * One item into its note: create it, or rewrite the three plugin-owned sections of the
+ * note it already has. Shared by Sync now and "Zotero: Import item". Records the note in
+ * `state.items` (the caller saves state) and returns `{ status, uuid }`, status being
+ * "created" or "updated". Throws when a known note can't be found any more.
+ *
+ * `libraryKey` (library.js's libraryStateKey) is stored on entries from a group, so a
+ * later sync of a different library leaves them alone. My Library entries carry none,
+ * which is also what every entry written before group support looks like.
+ */
+export async function syncItemNote(app, client, item, state, tpl, libraryKey = "user") {
+  const existing = state.items[item.key];
+  const extras = await getExtrasOrEmpty(client, item.key);
+
+  if (existing) {
+    const uuid = await resolveNoteUUID(app, existing, item.title);
+    if (!uuid) {
+      throw new Error(`note ${existing.noteUUID} no longer exists, and no note named "${item.title}" was found to recover it`);
+    }
+    if (await isSectioned(app, uuid)) {
+      const label = `"${item.title}"`;
+      await writeSection(app, uuid, REFERENCE_HEADING, renderReference(item, extras, tpl.reference), sectionOpts(label));
+      await writeSection(app, uuid, ZOTERO_NOTES_HEADING, renderZoteroNotes(extras.notes), sectionOpts(label));
+      await writeSection(app, uuid, HIGHLIGHTS_HEADING, renderAnnotations(extras.annotations, tpl.highlight), sectionOpts(label));
+    } else {
+      await app.replaceNoteContent({ uuid }, renderItemNote(item, extras, tpl));
+    }
+    existing.title = item.title;
+    return { status: "updated", uuid };
+  }
+
+  const uuid = await app.createNote(item.title, item.tags);
+  await app.insertNoteContent({ uuid }, renderItemNote(item, extras, tpl), { atEnd: true });
+  state.items[item.key] = { noteUUID: uuid, title: item.title };
+  if (libraryKey !== "user") state.items[item.key].library = libraryKey;
+  return { status: "created", uuid };
+}
+
 /**
  * "Zotero: Sync now" (Phase 3 content sync + Phase 4 annotation import, roadmap.md).
  * Manual trigger rather than automatic/background — Amplenote plugins have no
@@ -241,13 +313,16 @@ const sectionOpts = (label) => ({ headingLevel: "##", noteLabel: label });
  * sections refreshed, every run. Not incremental, by design: roughly one extra Zotero
  * request per already-synced item per manual sync, in exchange for actually catching a
  * highlight or note added without any other edit to the item.
+ *
+ * One library per run — the one the "Zotero library" setting names. The watermark is
+ * that library's, so a switch to another library makes the next run a full one, and
+ * the refresh pass skips notes that came from a different library than this run's.
  */
 export async function syncLibrary(app) {
-  const apiKey = (app.settings[SETTING_ZOTERO_API_KEY] || "").trim();
-  if (!apiKey) {
-    await app.alert(`Set the "${SETTING_ZOTERO_API_KEY}" row in this plugin note's metadata table first.`);
-    return;
-  }
+  const connection = await connect(app);
+  if (!connection) return;
+  const { client, library } = connection;
+  const libraryKey = libraryStateKey(library);
 
   let state;
   try {
@@ -257,21 +332,18 @@ export async function syncLibrary(app) {
     return;
   }
 
-  const client = createZoteroClient({ apiKey });
   const filter = parseFilterSetting(app.settings[SETTING_ZOTERO_SYNC_FILTER]);
   const signature = filterSignature(filter);
   // A changed filter needs a full resync, not an incremental one: an item that predates
   // the last sync but only just became relevant under a newly-added collection/tag
-  // would never come back via since=, since its own metadata hasn't changed.
+  // would never come back via since=, since its own metadata hasn't changed. A changed
+  // library likewise: the stored watermark is a version number of the OTHER library.
   const filterChanged = state.filterSignature !== undefined && state.filterSignature !== signature;
-  const sinceVersion = filterChanged ? undefined : state.libraryVersion ?? undefined;
+  const libraryChanged = (state.library ?? "user") !== libraryKey;
+  const sinceVersion = filterChanged || libraryChanged ? undefined : state.libraryVersion ?? undefined;
 
   const style = (app.settings[SETTING_ZOTERO_CITATION_STYLE] || "").trim() || DEFAULT_CITATION_STYLE;
-  // Blank templates mean the built-in layout; see src/template.js.
-  const tpl = {
-    reference: app.settings[SETTING_REFERENCE_TEMPLATE] || "",
-    highlight: app.settings[SETTING_HIGHLIGHT_TEMPLATE] || "",
-  };
+  const tpl = readTemplates(app);
 
   let result;
   try {
@@ -288,35 +360,14 @@ export async function syncLibrary(app) {
 
   for (const item of result.items) {
     touchedKeys.add(item.key);
-    const existing = state.items[item.key];
 
     // Isolated per item: one bad write (e.g. a stored noteUUID that no longer resolves)
     // must not silently abort the rest of the sync, the way every other failure path in
     // this action alerts a clear message instead of throwing uncaught.
     try {
-      const extras = await getExtrasOrEmpty(client, item.key);
-
-      if (existing) {
-        const uuid = await resolveNoteUUID(app, existing, item.title);
-        if (!uuid) {
-          throw new Error(`note ${existing.noteUUID} no longer exists, and no note named "${item.title}" was found to recover it`);
-        }
-        if (await isSectioned(app, uuid)) {
-          const label = `"${item.title}"`;
-          await writeSection(app, uuid, REFERENCE_HEADING, renderReference(item, extras, tpl.reference), sectionOpts(label));
-          await writeSection(app, uuid, ZOTERO_NOTES_HEADING, renderZoteroNotes(extras.notes), sectionOpts(label));
-          await writeSection(app, uuid, HIGHLIGHTS_HEADING, renderAnnotations(extras.annotations, tpl.highlight), sectionOpts(label));
-        } else {
-          await app.replaceNoteContent({ uuid }, renderItemNote(item, extras, tpl));
-        }
-        existing.title = item.title;
-        updated++;
-      } else {
-        const uuid = await app.createNote(item.title, item.tags);
-        await app.insertNoteContent({ uuid }, renderItemNote(item, extras, tpl), { atEnd: true });
-        state.items[item.key] = { noteUUID: uuid, title: item.title };
-        created++;
-      }
+      const { status } = await syncItemNote(app, client, item, state, tpl, libraryKey);
+      if (status === "created") created++;
+      else updated++;
     } catch (e) {
       failures.push(`${item.title} (${e.message})`);
     }
@@ -325,6 +376,8 @@ export async function syncLibrary(app) {
   let highlightsRefreshed = 0;
   for (const [key, entry] of Object.entries(state.items)) {
     if (touchedKeys.has(key)) continue;
+    // Another library's item: this client would ask the wrong library for it and fail.
+    if ((entry.library ?? "user") !== libraryKey) continue;
     try {
       // Older entries predate title tracking. Backfill from Zotero itself (the item key
       // is always a reliable handle) so resolveNoteUUID has a name to fall back on —
@@ -359,6 +412,7 @@ export async function syncLibrary(app) {
 
   if (result.lastModifiedVersion !== null) state.libraryVersion = result.lastModifiedVersion;
   state.filterSignature = signature;
+  state.library = libraryKey;
 
   try {
     await saveSyncState(app, state);

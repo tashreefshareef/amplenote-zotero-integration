@@ -1,5 +1,6 @@
-import { SETTING_ZOTERO_API_KEY, SETTING_ZOTERO_SYNC_FILTER } from "../constants.js";
-import { createZoteroClient, describeZoteroError } from "../zotero-client.js";
+import { SETTING_ZOTERO_SYNC_FILTER } from "../constants.js";
+import { describeZoteroError } from "../zotero-client.js";
+import { connect } from "../setup.js";
 import { renderFilterSetting } from "../sync-filter.js";
 
 /**
@@ -20,13 +21,9 @@ import { renderFilterSetting } from "../sync-filter.js";
  * for a prompt input is a separate, still-unconfirmed assumption.
  */
 export async function configureSync(app) {
-  const apiKey = (app.settings[SETTING_ZOTERO_API_KEY] || "").trim();
-  if (!apiKey) {
-    await app.alert(`Set the "${SETTING_ZOTERO_API_KEY}" row in this plugin note's metadata table first.`);
-    return;
-  }
-
-  const client = createZoteroClient({ apiKey });
+  const connection = await connect(app);
+  if (!connection) return;
+  const { client } = connection;
   let collections;
   let tags;
   let categories;

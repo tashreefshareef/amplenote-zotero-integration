@@ -320,6 +320,26 @@ Related: the plugin's old blanket message for any `ZoteroApiError` was "Check th
 current," which is right only for 403. It now branches per status — 403 blames the key,
 5xx blames the server (or the style), everything else states the status plainly.
 
+## ✅ A BibTeX entry comes back inside the normal JSON response — measured 2026-10-23
+
+`include=bibtex` works like `include=citation`: the entry arrives as a `bibtex` string
+field on the item envelope, so no separate non-JSON request (`format=bibtex`) is needed.
+
+```
+GET /groups/30/items/top?limit=1&include=data,bibtex,citation&style=apa   200
+  "bibtex": "\n@misc{zotero-item-23099,\n\ttitle = {...},\n\turl = {...},\n}\n"
+```
+
+Two things to design for. The entry is wrapped in newlines and tab-indented. And without
+a Citation Key on the item, Zotero keys it `zotero-item-<id>` — not the `<author><year>`
+key this plugin's pandoc/LaTeX formats derive — so `cite-key.js` re-keys the entry to
+match. With a Citation Key set, both use it and the re-key changes nothing.
+
+The same request shows group items carry `library.type: "group"` and their own
+`links.alternate` on zotero.org/groups/…, so a synced group item's "View in Zotero"
+link needs no special handling. `/groups/<id>` itself answers without a key for a
+public group.
+
 ## Sources
 
 - Zotero Web API v3 basics — <https://www.zotero.org/support/dev/web_api/v3/basics>

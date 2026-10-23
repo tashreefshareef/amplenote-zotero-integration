@@ -19,6 +19,10 @@ export const DEFAULT_CITATION_STYLE = "chicago-note-bibliography";
 //    chicago-note-bibliography, ...). Blank = DEFAULT_CITATION_STYLE.
 //  - citation format: the DEFAULT offered by the citation picker; see cite-key.js's
 //    CITATION_FORMATS for the accepted values. Blank = "formatted".
+// Which Zotero library every action reads: blank = the key owner's own library, or a
+// group, written by "Zotero: Choose library" as `Group <id>: <name>` (library.js).
+export const SETTING_ZOTERO_LIBRARY = "Zotero library";
+
 export const SETTING_ZOTERO_CITATION_STYLE = "Zotero citation style";
 export const SETTING_ZOTERO_CITATION_FORMAT = "Zotero citation format";
 

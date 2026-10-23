@@ -31,13 +31,14 @@ describe("pickCitation", () => {
     jest.restoreAllMocks();
   });
 
-  test("alerts and returns null when no key is configured", async () => {
+  test("asks for the key and returns null when none is configured and the prompt is cancelled", async () => {
     const app = createMockApp();
 
     const result = await pickCitation(app);
 
     expect(result).toBeNull();
-    expect(app._calls.alerts[0]).toMatch(/Zotero API key/i);
+    expect(app._calls.prompts[0].options.inputs[0]).toMatchObject({ label: "Zotero API key", type: "secureText" });
+    expect(app._calls.alerts).toEqual([]);
   });
 
   test("returns null without any network call when the search prompt is cancelled", async () => {
@@ -170,6 +171,7 @@ describe("pickCitation — style and format settings", () => {
       "pandoc",
       "latex",
       "biblatex",
+      "bibtex",
     ]);
     expect(result.format).toBe("latex");
     expect(result.text).toBe("\\cite{kahneman2011}");

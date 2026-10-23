@@ -251,7 +251,7 @@ instead of embedding it.
 
 | File | Shows | Used for |
 |---|---|---|
-| `desktop-00-zotero-menu.png` | `/zotero` on desktop: Insert citation under INSERT, the other four under DISPLAY AND GLOBAL ACTIONS | Where the actions live |
+| `desktop-00-zotero-menu.png` | `/zotero` on desktop: Insert citation under INSERT, the other six under DISPLAY AND GLOBAL ACTIONS (retaken 2026-10-23, 400 px wide) | Where the actions live |
 | `desktop-01-test-connection.png` | The "Connected as …" alert, username and user ID blanked out | Set up |
 | `desktop-02-citation-picker.png` | Results for "zotero": the reference list open, two items | Cite as you write |
 | `desktop-03-synced-item-note.png` | The qLDPC item note: title, tags, Reference, then — after a divider band — Tags, Zotero Notes, the magenta highlight with page, link and comment, and My Notes. Two screens joined; the abstract between them is skipped | Sync your library into notes |
@@ -275,10 +275,16 @@ Notes; the phone one now ends after the highlight. Both are swapped into the plu
 **Cell updated 2026-10-23** for Import item, group libraries, BibTeX, the DOI fields and
 the first-run key prompt — edited in place, block by block, so the nine images were never
 re-uploaded. Checked after a reload: every changed passage present, no old wording left,
-9 images, 11 table rows, code block still byte-for-byte `dist/plugin-paste.js`. Two
-screenshots now lag the text: `desktop-00-zotero-menu` still shows five actions (seven
-now), and `desktop-01-test-connection` shows the settings-page route rather than the
-first-run prompt. Neither is wrong about what it shows; retake them when convenient.
+9 images, 11 table rows, code block still byte-for-byte `dist/plugin-paste.js`.
+`desktop-01-test-connection` shows the settings-page route rather than the first-run
+prompt; it isn't wrong about what it shows, so it stays until a retake is convenient.
+
+**`desktop-00-zotero-menu` retaken 2026-10-23** with all seven actions, same framing as
+before (the citation line, `/zotero`, the menu), and scaled to **400 px wide** (400×393,
+from a 660×648 capture) — the size cap for new screenshots in the cell. Swapped in by
+selecting the old image (a click selects it as a node) and pasting the PNG from the
+clipboard; Amplenote uploads a pasted image itself. Re-checked after a reload: 400 px
+shown, still 9 images, code block unchanged.
 
 How the in-place edit was done, for next time: select the block's text through the DOM,
 put the replacement on the clipboard as **HTML** (`<b>`/`<code>` survive the paste), and

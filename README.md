@@ -3,27 +3,22 @@
 An Amplenote plugin that connects a Zotero library to Amplenote notes — reference search,
 formatted citation insertion, content sync, and annotation import.
 
-Built for the [Amplenote plugin bounty](https://public.amplenote.com/u1ivsVxuqee3TntAwJ5Pvca8).
-
-> **Status: Phase 6 — mobile, docs, submission.** Phases 1–5 are built and each was
-> verified in the live app: reference search and citation insertion, content sync (one
-> note per Zotero item, incremental), highlight and note import, and the sync filter by
-> collections, tags and item types — plus citation styles, cite keys and layout templates.
-> A run on an Android phone (2026-10-10) passed every action but one; that one, Search
-> citation, is fixed and re-verified on the phone (`docs/mobile-check.md`). Left: user
-> instructions and screenshots, and submission. See `docs/roadmap.md`.
+> **Status:** every feature is built and verified in the live Amplenote app: reference
+> search and citation insertion (formatted, bibliography, Pandoc/LaTeX keys, BibTeX),
+> content sync (one note per Zotero item, incremental), single-item import, highlight and
+> note import, group libraries, and the sync filter by collections, tags and item types —
+> plus citation styles, cite keys and layout templates. Checked on an Android phone too
+> (`docs/mobile-check.md`).
 
 ## Start here
 
 | Document | What it is |
 |---|---|
-| [`docs/roadmap.md`](docs/roadmap.md) | The build plan, phased, estimated bottom-up with fixed per-plugin overhead separated from per-feature work — and read against what the bounty actually pays |
-| [`docs/zotero-findings.md`](docs/zotero-findings.md) | Verified Zotero + Amplenote facts for this project — all four Phase 0 spikes closed live |
-| [`docs/bounty-note.md`](docs/bounty-note.md) | The bounty requirements, verbatim, including the footnote the rendered page drops |
+| [`docs/zotero-findings.md`](docs/zotero-findings.md) | Verified Zotero + Amplenote facts for this project, including the four feasibility spikes, all closed live |
 | [`docs/api-notes.md`](docs/api-notes.md) | Confirmed Amplenote API signatures and platform quirks. **Carried over and still living** — its "Lessons for the NEXT Amplenote plugin" section was written for this project |
 | [`docs/bugs-found.md`](docs/bugs-found.md) | General web-platform bugs and fixes. Also carried over, also still living |
 | [`docs/development.md`](docs/development.md) | Build, test, and how to set up the plugin note in Amplenote |
-| [`docs/plugin-instructions.md`](docs/plugin-instructions.md) | The end-user instructions, ready to paste into the plugin note's instructions cell, plus the screenshots still to capture |
+| [`docs/plugin-instructions.md`](docs/plugin-instructions.md) | The end-user instructions, as they appear in the plugin note's instructions cell, and the screenshots that go with them |
 | [`docs/mobile-check.md`](docs/mobile-check.md) | The Android checklist and its results — where each action lives on mobile, and what does not work there |
 
 ## The short version of the research
@@ -35,9 +30,9 @@ Built for the [Amplenote plugin bounty](https://public.amplenote.com/u1ivsVxuqee
 - **Citations render server-side** via `include=citation,bib&style=`, so no CSL engine
   ships in the bundle. That matters: a dense plugin code block costs 15–60 seconds just to
   *open* the plugin note.
-- **The Obsidian plugin the bounty names cannot be replicated** — it requires Zotero
-  desktop and Better BibTeX over localhost. Parity has to be by outcome. The bounty's own
-  footnote, *"Or as close as possible"*, is what licenses that.
+- **The Obsidian Zotero plugin can't be replicated by mechanism** — it requires Zotero
+  desktop and Better BibTeX over localhost, which an Amplenote plugin can't reach. This
+  plugin matches it by outcome instead, over the Zotero Web API.
 - **PDF attachment import does not work** as a real Amplenote attachment — confirmed live:
   `attachNoteMedia` rejects PDFs, and the Zotero file endpoint redirects to storage with no
   CORS headers, so the plugin can't read the bytes either. Viewing one inside Amplenote
@@ -61,7 +56,7 @@ This is the second Amplenote plugin in this series, and a lot transfers.
 add to them, don't fork them.
 
 `reference/pdf-annotator/` holds working code from that project kept as **templates, not
-dependencies**. None of it runs unmodified; Phase 1 adapted what was needed into place,
+dependencies**. None of it runs unmodified; what was needed was adapted into place,
 and the originals stay here for reference.
 
 | File | Why it's here |
@@ -73,7 +68,6 @@ and the originals stay here for reference.
 | `plugin-builder-patched.js` | The patched Plugin Builder that actually syncs |
 | `development.md` | How the build, harness and factory-injection test pattern work |
 | `plugin-instructions.md` | The shape of the end-user install doc |
-| `bounty-intent-email.md` | The intent-email template, to be adapted and sent in Phase 0 |
 
 ## Setup
 

@@ -4,8 +4,7 @@ How to build, test and run this plugin. For the platform facts behind these choi
 [`api-notes.md`](api-notes.md) and [`zotero-findings.md`](zotero-findings.md).
 
 Adapted from `reference/pdf-annotator/development.md` — that file is the fuller
-reference; this one covers what's actually true of this repo today, and will grow as
-later phases add an embed, a harness, and the rest.
+reference; this one covers what's actually true of this repo today.
 
 ## Why there's a build step
 
@@ -14,8 +13,8 @@ code block inside a note — no imports, no npm at runtime, no bundler in the sa
 This repo authors normal ES modules in `src/` and uses esbuild to collapse them into
 the single expression Amplenote expects.
 
-`dist/plugin.js` is the paste target and is committed on purpose — the bounty terms
-require the public repo to hold the code that actually runs.
+`dist/plugin.js` is the paste target and is committed on purpose, so the public repo
+holds the code that actually runs.
 
 ## Getting started
 
@@ -51,23 +50,23 @@ src/
   zotero-client.js     Zotero Web API v3 client: auth header, since= pagination,
                        Backoff/Retry-After, searchItems(), syncItems()
   format-citation.js   Strips Zotero's citation/bib HTML to plain text
-  sync-state.js        Reads/writes the Phase 3 sync watermark + key->noteUUID map,
+  sync-state.js        Reads/writes the sync watermark + key->noteUUID map,
                        persisted as JSON in a fenced code block (api-notes.md #4/#4b)
   note-sections.js      Shared heading/section read+write helpers (writeSection),
                        used by sync-state.js and by sync-library.js's Highlights section
   actions/
-    test-connection.js   "Zotero: Test connection" — the Phase 1 smoke test
+    test-connection.js   "Zotero: Test connection" — the smoke test
     citation-picker.js   Search Zotero, pick a result — shared by the insertText
-                         and appOption citation actions (Phase 2)
+                         and appOption citation actions
     sync-library.js      "Zotero: Sync now" — items -> one note each, Zotero tags ->
-                         Amplenote tags, incremental via since= (Phase 3), plus
-                         imported highlights/notes per item (Phase 4)
+                         Amplenote tags, incremental via since=, plus
+                         imported highlights/notes per item
 esbuild.js            Build: src/ → dist/plugin.js
 dist/plugin.js        Build output (committed)
 test/
   helpers.js           Mock Amplenote `app` object
 docs/api-notes.md      Verified Amplenote API signatures and platform quirks
-docs/zotero-findings.md  Verified Zotero facts and the closed Phase 0 spikes
+docs/zotero-findings.md  Verified Zotero facts and the closed feasibility spikes
 ```
 
 ## Testing
@@ -150,7 +149,7 @@ needs:
 
 Then run **Zotero: Test connection** from the `/` slash-command picker in any note, with
 your key filled in. It should alert back your Zotero username, userID and access scope.
-That's the live-app check this phase ends on (`CLAUDE.md`).
+That's the first live-app check (`CLAUDE.md`).
 
 ## Running actions live
 
@@ -201,7 +200,7 @@ regardless of what's actually on `main`. If a refresh doesn't pick up a change t
 definitely pushed, that's the likely cause; wait a few minutes and retry, or paste
 `dist/plugin-paste.js` by hand for an immediate check.
 
-## Phase 3: content sync — live-verified, 2026-09-06
+## Content sync — live-verified, 2026-09-06
 
 `Zotero: Sync now` (an `appOption`) pulls the library via `since=` incremental sync,
 writes one Amplenote note per Zotero item (title, formatted bibliography, abstract if
@@ -210,7 +209,7 @@ tags as the note's tags at creation time, and persists a key -> noteUUID map plu
 library-version watermark as JSON in a fenced code block inside a note named "Zotero
 Sync" (`src/sync-state.js`).
 
-Known, deliberate trims (roadmap.md's "trimmed build"):
+Known, deliberate trims:
 - **Deletions aren't synced.** Zotero exposes deletions via a separate endpoint; a note
   whose Zotero item was deleted just stops being touched by future syncs.
 - **Tags don't refresh on a re-sync.** There is no confirmed Amplenote API to retag an
@@ -230,8 +229,8 @@ designed fallback, not a bug):
   1 updated`, matched the item by its stored key, and rewrote the existing note in place
   — no duplicate created. `app.createNote`'s returned uuid came back prefixed
   `local-...` and stayed valid for that particular write. **It did NOT stay valid
-  indefinitely** — see Phase 4 below and `api-notes.md` finding 18. Given the actual
-  scope of that finding, this Phase 3 result is best read as "worked within the window
+  indefinitely** — see the next section and `api-notes.md` finding 18. Given the actual
+  scope of that finding, this result is best read as "worked within the window
   tested," not as evidence the id is durable.
 - **A run that appeared to silently do nothing** (no alert, no error) turned out to be a
   stale browser tab/session, not a plugin bug — confirmed by the identical action
@@ -242,7 +241,7 @@ designed fallback, not a bug):
   aborted the whole sync silently. Fixed — failures are now isolated per item and
   reported in the final alert alongside the new/updated counts.
 
-## Phase 4: attachments and annotations — live-verified, 2026-09-07
+## Attachments and annotations — live-verified, 2026-09-07
 
 **A live run of the highlights-refresh pass failed on all 4 previously-synced items**,
 each with `Cannot read properties of null (reading 'split')`. Root cause chased to
@@ -295,7 +294,7 @@ unrelated-looking floating paragraph right after the quote, nothing tying the tw
 together but adjacency. Fixed by labeling it `_Comment: ..._` explicitly rather than
 relying on position to imply the connection.
 
-Phase 4 is done. What's still unconfirmed, lower priority: `image`/`ink` annotation
+Done. What's still unconfirmed, lower priority: `image`/`ink` annotation
 types (named-but-not-rendered placeholder path never exercised against a real one), and
 an item with more than one attachment or more than a handful of annotations (ordering
 and volume at scale untested).
@@ -303,7 +302,7 @@ and volume at scale untested).
 Folded into the same `Zotero: Sync now` action rather than a separate one, since it
 writes into the same per-item note. Each item note now also gets:
 - A `[View "<filename>" in Zotero](...)` link per attachment, using that attachment's own
-  `links.alternate.href` — same pattern as Phase 3's item-level "View in Zotero" link, no
+  `links.alternate.href` — same pattern as content sync's item-level "View in Zotero" link, no
   URL construction/guessing involved.
 - A `## Highlights & Notes` section: every annotation (highlight text + any comment, or a
   sticky note's comment alone) under that item's attachments, in Zotero's own
@@ -312,7 +311,7 @@ writes into the same per-item note. Each item note now also gets:
   (`zotero-findings.md`, no CORS on Zotero's file storage) applies equally to an
   annotation's extracted image.
 
-**The reason this needed more than "reuse Phase 3's per-item loop":** Zotero's item-level
+**The reason this needed more than "reuse content sync's per-item loop":** Zotero's item-level
 `since=` only reports a change to the TOP item's own metadata, not to a highlight added
 two levels down (item -> attachment -> annotation) with nothing else about the item
 touched — so an item genuinely unchanged since the last sync would never be revisited,
@@ -322,9 +321,9 @@ sync) that re-fetches and rewrites just its Highlights section. This is a real,
 deliberate cost — one extra Zotero request per previously-synced item, every manual
 sync, not just for what changed — accepted because it's a user-initiated action (not
 automatic/background) and because catching a highlight-only edit is the actual point of
-this phase.
+this feature.
 
-Unverified against the live app. Before trusting this phase, sync a library where at
+Unverified against the live app. Before trusting this feature, sync a library where at
 least one item has a PDF with highlights, and check:
 - The item's note shows the attachment link and the highlights, in the right order,
   including a comment on a highlight if one exists.
@@ -333,11 +332,11 @@ least one item has a PDF with highlights, and check:
   its note's Highlights section should show the change, with the rest of the note
   untouched.
 
-## Phase 5: sync filter (collections + tags + categories) — live-verified, 2026-09-07
+## Sync filter (collections + tags + categories) — live-verified, 2026-09-07
 
 `Zotero: Configure sync` fetches your collections, tags, and categories (Zotero's item
-types — Journal Article, Book, Document, ...; the bounty's own third named axis
-alongside collections and tags), offers them as `app.prompt` checkbox inputs, and writes
+types — Journal Article, Book, Document, ...; a third axis alongside collections and
+tags), offers them as `app.prompt` checkbox inputs, and writes
 the selection to the `Zotero sync filter` setting as human-readable text
 (`Collections: X, Y` / `Tags: A, B` / `Categories: Journal Article, Book`, per
 api-notes.md #9c — store what a human would type, since the text field stays visible
@@ -350,15 +349,15 @@ de-duplicated by item key. Changing the filter between runs forces a full resync
 but only just became relevant under a newly-added collection/tag/category would never
 come back via `since=` otherwise, since its own metadata hasn't changed.
 
-Categories was originally cut when Phase 5 was first scoped (the trimmed-build plan said
-"collections and tags, nothing more") — added afterward once it was clear there was no
+Categories was originally left out when the filter was first scoped ("collections and
+tags, nothing more") — added afterward once it was clear there was no
 platform reason to leave it out: `GET /itemTypes` is a fixed, unauthenticated schema
 endpoint, and item-type filtering reuses the exact same OR-union pattern already built
 and tested for tags.
 
 **CONFIRMED LIVE, 2026-09-07: `app.prompt`'s `checkbox` input type is a single ON/OFF
 toggle, not a multi-select list.** The first build declared one `checkbox` input labeled
-"Collections" carrying an `options` array (the `select` pattern from Phase 0 spike #4) —
+"Collections" carrying an `options` array (the `select` pattern from zotero-findings.md spike #4) —
 live, that rendered as exactly ONE checkbox named "Collections", the array silently
 ignored. Rebuilt to declare one `checkbox` input per selectable name instead (prefixed
 `Collection: `/`Tag: ` since there's no section-heading input to group them), reading the
@@ -391,21 +390,21 @@ verified for the right reason, not just a plausible-looking number: the qLDPC pa
 `Item Type` in Zotero is `Preprint`, a different category from `Journal Article`, checked
 directly against the source rather than assumed.
 
-Phase 5 is done, all three axes (collections, tags, categories) live-verified. Not yet
+Done, all three axes (collections, tags, categories) live-verified. Not yet
 exercised: a filter selecting criteria that overlap only partially (some shared items,
 some exclusive to one side) — everything tested live so far was either "everything
 matches" or "exactly one item matches."
 
 ## Parity pass against the Obsidian reference plugin
 
-The bounty asks for parity "or as close as possible" with
+The goal is parity, or as close as possible, with
 [obsidian-zotero-integration](https://github.com/community-archive/obsidian-zotero-integration).
 Audited against what that plugin actually does — its `docs/` (Templating, Export
 Settings, PDF Annotations, FAQ), its command registrations in `src/main.ts`, and its
 format types — not its README, which is thin. Two findings reframed earlier worries:
 
 - **It has no automatic sync either.** Every import there is a manual command. Manual
-  `Sync now` is at parity; the bounty's "automatically" exceeds the plugin it cites.
+  `Sync now` is at parity; automatic sync would exceed it.
 - **It doesn't import PDF files either.** It links out (`zotero://open-pdf`) and extracts
   annotations. Our deep link is the same outcome.
 

@@ -11,8 +11,8 @@ Maintaining that as one hand-edited file doesn't scale, so this repo authors nor
 modules in `src/` and uses esbuild to collapse them into the single expression Amplenote
 expects.
 
-`dist/plugin.js` is the paste target. It's committed on purpose — the bounty terms
-require the public repo to hold the code that actually runs.
+`dist/plugin.js` is the paste target. It's committed on purpose, so the public repo
+holds the code that actually runs.
 
 ## Getting started
 
@@ -60,7 +60,7 @@ the markdown that would be written.
 This exists because coordinate bugs are only visible against a real PDF.js text layer,
 and the alternative loop (build, push, Plugin Builder refresh, reload the note) is far
 too slow to debug geometry in. What it **cannot** tell you is whether Amplenote's sandbox
-accepts the embed — only the live app answers that, so every phase still ends with a run
+accepts the embed — only the live app answers that, so every change still ends with a run
 in real Amplenote.
 
 `?seed=overlappingHighlights` pre-populates the note with two different-colored
@@ -146,8 +146,8 @@ read-back tests exercise the actual logic rather than asserting on canned values
 This has a design consequence worth knowing before contributing: **action logic must
 live in pure, importable functions in `src/` that take `app` as a parameter.** Anything
 written inline in the plugin object, or welded into an embed HTML string, is unreachable
-from tests. The bounty terms require test coverage of every action that modifies note
-data, so untestable code is a compliance problem and not only a style one.
+from tests. Every action that modifies note data should be covered by tests, so
+untestable code is a real gap and not only a style problem.
 
 The embed pushes that further. `src/embed/viewer.js` cannot import anything — it is
 serialized with `.toString()` and injected into the page — so any logic worth testing

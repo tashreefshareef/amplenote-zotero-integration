@@ -10,9 +10,9 @@
  *   Categories: Journal Article, Book
  *
  * Any line may be absent. No lines (or an empty setting) means no filter — sync the
- * whole library, matching this plugin's original, pre-Phase-5 behavior. "Categories" is
- * Zotero's item type (Journal Article, Book, Document, ...) — the bounty's own wording
- * for a third selection axis alongside collections and tags.
+ * whole library, matching the plugin's behavior before filtering existed. "Categories"
+ * is Zotero's item type (Journal Article, Book, Document, ...), a third selection axis
+ * alongside collections and tags.
  */
 
 function splitNames(text) {

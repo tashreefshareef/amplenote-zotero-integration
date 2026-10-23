@@ -1,8 +1,8 @@
 /**
  * Mock Amplenote `app` object.
  *
- * Plugin actions can't run outside the Amplenote sandbox, so the only way to satisfy the
- * bounty's test-coverage requirement is to call them with a stand-in `app` and assert on
+ * Plugin actions can't run outside the Amplenote sandbox, so the only way to test them
+ * is to call them with a stand-in `app` and assert on
  * what they did to it. The mock keeps real in-memory note state rather than returning
  * canned values, so round-trip tests (write, then read back) actually exercise the logic.
  *

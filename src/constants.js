@@ -5,7 +5,7 @@ export const ZOTERO_API_VERSION = "3";
 // sync with the plugin note's own metadata table — see docs/development.md.
 export const SETTING_ZOTERO_API_KEY = "Zotero API key";
 
-// Phase 5: which collections/tags to sync, as human-readable text (see sync-filter.js).
+// Which collections/tags to sync, as human-readable text (see sync-filter.js).
 // Also declared as a `setting | <label>` row — app.setSetting writes here need the row
 // to already exist, same as the API key.
 export const SETTING_ZOTERO_SYNC_FILTER = "Zotero sync filter";
@@ -31,7 +31,7 @@ export const SETTING_ZOTERO_CITATION_FORMAT = "Zotero citation format";
 export const SETTING_REFERENCE_TEMPLATE = "Zotero reference template";
 export const SETTING_HIGHLIGHT_TEMPLATE = "Zotero highlight template";
 
-// Phase 3 sync bookkeeping (key -> noteUUID map, library version watermark) lives in a
+// Sync bookkeeping (key -> noteUUID map, library version watermark) lives in a
 // fenced code block under this heading, in a note with this name. api-notes.md #4: machine
 // data belongs in a fence, never bare paragraph text. #4b: a heading is only as unique as
 // its text, so sync-state.js counts occurrences before trusting a heading-addressed write.

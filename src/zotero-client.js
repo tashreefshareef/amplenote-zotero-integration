@@ -12,8 +12,8 @@
  *     hammer the API in a retry loop it didn't know it was in.
  *   - `paginate()` DOES pause between pages when a successful response carries a
  *     `Backoff` header — that header means "you're fine, but slow down", and honouring
- *     it during a multi-page sync is exactly the retrofit the roadmap warns against
- *     doing later ("how you get banned mid-demo").
+ *     it during a multi-page sync is not something to retrofit later — ignoring it is
+ *     how a client gets rate-limited mid-sync.
  */
 import { ZOTERO_API_BASE, ZOTERO_API_VERSION, DEFAULT_CITATION_STYLE } from "./constants.js";
 import { stripHtmlToText, htmlToParagraphText } from "./format-citation.js";
@@ -289,7 +289,7 @@ export function createZoteroClient({
   }
 
   /**
-   * Phase 3 content sync. `sinceVersion` omitted means a full pull (first-ever sync);
+   * Content sync. `sinceVersion` omitted means a full pull (first-ever sync);
    * passed, Zotero returns only items changed after that library version. Same item
    * shape as `searchItems` plus the fields sync needs beyond a citation: `version` (this
    * item's own watermark, unused today but cheap to carry), `tags` (applied to the
@@ -298,8 +298,8 @@ export function createZoteroClient({
    * `links.alternate.href`, already on the envelope with no extra round trip).
    *
    * Deletions are a separate Zotero endpoint (`/items/trash` or a `deleted?since=` feed)
-   * and are NOT handled here — the roadmap's trimmed scope keeps the incremental pull but
-   * drops the deletion tail. A note whose Zotero item was deleted just stops being
+   * and are NOT handled here — the incremental pull is kept, the deletion tail is
+   * deliberately left out. A note whose Zotero item was deleted just stops being
    * touched by future syncs.
    */
   async function syncItems({ sinceVersion, style = DEFAULT_CITATION_STYLE, pageSize = 50 } = {}) {
@@ -312,7 +312,7 @@ export function createZoteroClient({
     return { lastModifiedVersion, items: items.map(mapSyncItem) };
   }
 
-  /** Zotero collections, for Phase 5's config picker and collection-scoped sync below.
+  /** Zotero collections, for Configure sync's picker and collection-scoped sync below.
    * Collections have a stable `key`, unlike tags — see `listTags`. */
   async function listCollections() {
     const lib = await libraryPath();
@@ -329,7 +329,7 @@ export function createZoteroClient({
   }
 
   /**
-   * Zotero's fixed catalog of item types — the bounty's "categories" axis. Unlike
+   * Zotero's fixed catalog of item types — the "categories" filter axis. Unlike
    * collections/tags this is a global schema endpoint, not scoped to `/users/<uid>` or
    * to what's actually used in this library (no auth/userID needed at all). `attachment`
    * and `note` are excluded from what's returned: neither is ever synced as its own
@@ -344,8 +344,8 @@ export function createZoteroClient({
   }
 
   /**
-   * Phase 5: same shape as `syncItems`, scoped to selected collections, tags, and/or
-   * item types ("categories" in the bounty's wording), unioned — "in any selected
+   * Same shape as `syncItems`, scoped to selected collections, tags, and/or
+   * item types ("categories"), unioned — "in any selected
    * collection, OR carrying any selected tag, OR of any selected type" (checking more
    * boxes syncs more, matching how a filter checklist normally reads). Zotero has no
    * single query expressing an OR across these different kinds of criteria, so this
@@ -406,7 +406,7 @@ export function createZoteroClient({
   }
 
   /**
-   * Phase 4: an item's attachments and their annotations. Zotero nests annotations two
+   * An item's attachments and their annotations. Zotero nests annotations two
    * levels below a top-level item (item -> attachment -> annotation), so this costs one
    * children request for the item plus one per attachment found on it — acceptable for
    * a manual "Sync now" trigger, not something to run unbounded in a loop.

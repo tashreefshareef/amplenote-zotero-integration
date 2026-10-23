@@ -628,10 +628,10 @@ agreed. Found only by going to fetch a *larger* palette: Amplenote's stylesheet 
 `src/constants.js` had carried `#F3998C` and `#F4DE6C` since the first commit. One digit
 apart in the red channel, in two of our four colors. Green and blue matched exactly.
 
-**Cause:** the table came from the bounty note, and only green had ever been round-tripped
+**Cause:** the table came from the project's requirements doc, and only green had ever been round-tripped
 through Amplenote itself (`<mark data-text-color="15" style="color: #BBE077;">`, captured
 off the clipboard). The file's own comment said as much — "the other three come from the
-same bounty-note table, so the table is trustworthy" — which is exactly the inference that
+same requirements table, so the table is trustworthy" — which is exactly the inference that
 was wrong. One verified row does not vouch for the rows beside it. They were typos in a
 human-written document, and we inherited them as constants.
 

@@ -3,9 +3,9 @@
 Same purpose as `api-notes.md`, for the Zotero half of this plugin: **confirmed** facts
 only, with how each was confirmed. Anything unverified is marked as such.
 
-**Measured 2026-08-28** unless noted otherwise. The four Phase 0 spikes were closed
+**Measured 2026-08-28** unless noted otherwise. The four feasibility spikes were closed
 **2026-09-05**, live against a real Zotero library from inside an actual Amplenote embed —
-see "Phase 0 spikes — closed" below. The probe used is described there; it no longer
+see "Feasibility spikes — closed" below. The probe used is described there; it no longer
 exists in the repo (`spike/`, deleted once these findings were written up).
 
 ---
@@ -122,10 +122,10 @@ Source: <https://www.zotero.org/support/dev/client_coding/connector_http_server>
 **Consequence for scope, and it is the biggest one on this project:** see the parity note
 below.
 
-## ⚠️ The Obsidian plugin we are asked to match cannot be matched by mechanism
+## ⚠️ The Obsidian plugin this matches cannot be matched by mechanism
 
-The bounty asks for "feature parity to [this Obsidian
-integration](https://github.com/mgmeyers/obsidian-zotero-integration)". That plugin
+The goal is feature parity with [the Obsidian Zotero
+integration](https://github.com/mgmeyers/obsidian-zotero-integration). That plugin
 **hard-requires Zotero desktop running locally plus the Better BibTeX plugin**, and talks
 to them over the local server above. Its README: "Requires the Better BibTeX for Zotero
 plugin."
@@ -134,13 +134,9 @@ An Amplenote plugin has no desktop process and cannot reach localhost. So parity
 **by outcome** — citation insertion, library search, annotation import, bibliography —
 delivered over the Web API instead.
 
-**The bounty note licenses this explicitly.** Its "feature parity" footnote reads, in
-full: *"Or as close as possible"*. Raise it in the intent email so it is agreed in week
-zero rather than argued at submission. See `docs/bounty-note.md` for the verbatim source.
-
 ## ❌ Reading a Zotero-hosted attachment's bytes does not work from an embed — resolved
 
-Decides Phase 4's attachment half. Two related, now-closed questions.
+Decides how attachments can be imported. Two related, now-closed questions.
 
 **`/items/<key>/file` redirects to S3, and S3 sends no CORS headers.** Confirmed
 2026-09-05 by following the redirect manually (`redirect: "manual"`, then a direct request
@@ -174,10 +170,10 @@ real iframe, with its real origin, ruled that out. The proxy does not accept a Z
 under any request shape tried.
 
 **Consequence: nothing reads Zotero-hosted attachment bytes from inside the plugin.**
-Phase 4's attachment half degrades to a deep link into Zotero's web reader, as the roadmap
-already assumed and priced at 0.25 days — this closes the question rather than changing
-the plan. **Annotation import is unaffected**: Zotero annotations are ordinary API items,
-no file access involved, and that is the half of Phase 4 to guarantee.
+Attachments degrade to a deep link into Zotero's web reader, as already planned — this
+closes the question rather than changing the plan. **Annotation import is unaffected**:
+Zotero annotations are ordinary API items, no file access involved, and that is the half
+to guarantee.
 
 ## ❌ Known dead ends inherited from the PDF Annotator
 
@@ -195,7 +191,7 @@ Carried over so they are not rediscovered. Full detail in `api-notes.md`.
 | `Zotero-API-Key` response shape from `/keys/current` | `{ key, userID, username, displayName, access }` — `userID` is top-level, not nested. Confirmed live 2026-09-05. |
 | An `imported_url` attachment can be `text/html`, not a file | A library can hold a web-page snapshot (`storage.html`) alongside a real PDF, both under `linkMode` starting `imported_*`. Filtering on `linkMode` alone can pick the snapshot. Filter on `contentType === "application/pdf"` too if the goal is a document. |
 
-## ✅ Phase 0 spikes — closed, 2026-09-05
+## ✅ Feasibility spikes — closed, 2026-09-05
 
 All four resolved live, in one session, against a real Zotero library from inside an
 actual Amplenote embed and plugin context — not simulated. A purpose-built probe plugin
@@ -224,27 +220,26 @@ trip each.
      `app.prompt` appears to append an implicit action index even when no `actions` array
      is passed. Added to `api-notes.md`'s "Still unverified" table.
 
-   **Consequence: Phase 2's citation picker needs no embed.** A two-step "type a query →
+   **Consequence: the citation picker needs no embed.** A two-step "type a query →
    pick from the select" is a real `app.prompt`, not a fallback UX — a plugin-side Zotero
-   call runs between the `string` prompt and the `select` prompt. That leaves the Phase 5
-   config panel as the plugin's only embed, which shrinks the four-host mobile-testing
-   floor in `docs/roadmap.md` — worth roughly the ¾ day the roadmap already flagged for
-   this outcome.
+   call runs between the `string` prompt and the `select` prompt. That leaves the sync
+   filter's config panel as the only candidate for an embed (it became a prompt too), which
+   shrinks the mobile testing needed.
 
 ## ❌ A Zotero PDF cannot be VIEWED inside Amplenote either — six routes tested, 2026-09-20
 
-Phase 0 concluded the plugin can't read a Zotero attachment's **bytes**, and that was
+The feasibility spikes concluded the plugin can't read a Zotero attachment's **bytes**, and that was
 taken to mean in-note **viewing** was impossible too. That inference was wrong twice
 over — **CORS governs `fetch`/XHR, not `<iframe>`**, and viewing needs no text layer, so
 it doesn't need bytes at all. Re-opened and tested properly with a throwaway probe embed
-(now deleted, like Phase 0's). The conclusion survives, but it is now *measured* rather
+(now deleted, like the spikes' probe). The conclusion survives, but it is now *measured* rather
 than inherited, and the tested surface is much wider:
 
 | Route | Result |
 |---|---|
 | `<iframe>` the presigned file url | ❌ `onload` fires, then **Edge paints its own block page**. Zotero sends **no `X-Frame-Options`**, so framing isn't refused by Zotero — the file is served as a download, and Amplenote's plugin iframe is sandboxed without `allow-downloads`. |
 | `fetch()` bytes from **`files.zotero.net`** | ❌ "Failed to fetch" — not CORS-open. |
-| `fetch()` bytes from `zoterofilestorage.s3…` | ❌ No CORS header (Phase 0). |
+| `fetch()` bytes from `zoterofilestorage.s3…` | ❌ No CORS header (feasibility spikes). |
 | Amplenote's `cors-proxy`, **resolved** url | ❌ HTTP 400 — see below. |
 | `<embed>` / `<object type="application/pdf">` | ❌ Both render blank. |
 | `<iframe>` Zotero's own web reader | ❌ `www.zotero.org` sends **`X-Frame-Options: SAMEORIGIN`**. |
@@ -253,13 +248,13 @@ Three things worth keeping, because each corrects something previously believed:
 
 1. **`/items/<key>/file/view/url` exists and works** (HTTP 200), returning a presigned url
    as plain text. `api.zotero.org` is CORS-open, so the plugin *can* read that **string**
-   even though it can't read the **file**. Phase 0 never used this endpoint — it only
+   even though it can't read the **file**. The spikes never used this endpoint — it only
    ever called `/items/<key>/file`, which 302s.
-2. **That url points at `files.zotero.net`, not S3.** A host Phase 0 never saw, so its
+2. **That url points at `files.zotero.net`, not S3.** A host the spikes never saw, so their
    "no CORS on Zotero file storage" finding was, strictly, only ever measured against
    `zoterofilestorage.s3.amazonaws.com`. Now measured on both. Same answer.
-3. **Amplenote's `cors-proxy` is restricted to Amplenote's own attachment domain.** Phase
-   0 called it 400 for a Zotero url; it also 400s for `httpbin.org` and every other host
+3. **Amplenote's `cors-proxy` is restricted to Amplenote's own attachment domain.** The
+   spikes saw it 400 for a Zotero url; it also 400s for `httpbin.org` and every other host
    tried from curl, so it rejects the *target*, not just Zotero. Don't reach for it as a
    general-purpose proxy for a future plugin — it is not one.
 
@@ -268,7 +263,7 @@ means routing a presigned url — and therefore the user's actual document — t
 server neither we nor Amplenote control. Not acceptable for a research library.
 
 **So the deep link stands as the answer**, and it is the same answer the Obsidian plugin
-the bounty cites gives (`zotero://open-pdf`): the bullet's "seamless viewing within the
+gives (`zotero://open-pdf`): the goal of "seamless viewing within the
 same interface" is not reachable by any plugin on this platform, first- or third-party.
 
 ## ✅ Better BibTeX keys arrive through the Web API — no Better BibTeX dependency needed
@@ -345,5 +340,3 @@ public group.
 - Zotero Web API v3 basics — <https://www.zotero.org/support/dev/web_api/v3/basics>
 - Zotero local HTTP server — <https://www.zotero.org/support/dev/client_coding/connector_http_server>
 - The Obsidian plugin — <https://github.com/mgmeyers/obsidian-zotero-integration>
-- The bounty note — <https://public.amplenote.com/u1ivsVxuqee3TntAwJ5Pvca8>
-  (append `.md` for the raw markdown — that is how the footnote text was recovered)

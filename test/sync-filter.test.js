@@ -66,7 +66,7 @@ describe("filterSignature", () => {
     expect(a).not.toBe(b);
   });
 
-  test("tolerates a missing categories field (pre-Phase-5-categories saved state)", () => {
+  test("tolerates a missing categories field (saved before categories existed)", () => {
     expect(() => filterSignature({ collections: [], tags: [] })).not.toThrow();
   });
 });

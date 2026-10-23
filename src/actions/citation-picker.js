@@ -6,8 +6,8 @@ import { connect } from "../setup.js";
 
 // zotero-findings.md confirmed a `string` and a `select` input coexisting in ONE
 // app.prompt returns a positional array. It did not test a prompt with a SINGLE input —
-// unconfirmed whether that returns a bare value or a one-element array. Handle both
-// until a live run settles it (see docs/development.md's live-check step for this phase).
+// unconfirmed whether that returns a bare value or a one-element array, so this handles
+// both (docs/development.md, "Running actions live").
 function firstValue(promptResult) {
   return Array.isArray(promptResult) ? promptResult[0] : promptResult;
 }
@@ -82,8 +82,9 @@ export async function searchAndPick(app, client, style) {
  * FORMAT (cite-key.js's CITATION_FORMATS) comes from a setting when one is set — no
  * extra prompt — and is otherwise asked for in its own single-select prompt after the
  * reference is picked. Confirmed live, 2026-09-07: a prompt declaring TWO `select`
- * inputs rendered only the first (a `string` + a `select` together is fine — Phase 0
- * spike #4), so the format can't ride along in the results prompt as a second select.
+ * inputs rendered only the first (a `string` + a `select` together is fine —
+ * zotero-findings.md, spike #4), so the format can't ride along in the results prompt
+ * as a second select.
  *
  * Returns the picked item plus `format` and `text` (the string to insert), or null.
  */

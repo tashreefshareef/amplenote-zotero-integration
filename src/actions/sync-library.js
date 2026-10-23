@@ -43,7 +43,7 @@ function zoteroOpenLink(a) {
 }
 
 /**
- * Resolves the Phase 5 collections/tags/categories filter into what
+ * Resolves the collections/tags/categories sync filter into what
  * `client.syncFilteredItems` needs. Collection NAMES -> KEYS (Zotero's collection-scoped
  * endpoint needs the key) and category NAMES -> Zotero's raw `itemType` values both need
  * a fresh lookup each run — the filter setting stores human-readable names, per
@@ -289,7 +289,7 @@ export async function syncItemNote(app, client, item, state, tpl, libraryKey = "
 }
 
 /**
- * "Zotero: Sync now" (Phase 3 content sync + Phase 4 annotation import, roadmap.md).
+ * "Zotero: Sync now": content sync plus highlight and note import.
  * Manual trigger rather than automatic/background — Amplenote plugins have no
  * background execution to run this on (and the Obsidian reference plugin is manual too).
  *

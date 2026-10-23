@@ -4,12 +4,13 @@ import { connect } from "../setup.js";
 import { renderFilterSetting } from "../sync-filter.js";
 
 /**
- * "Zotero: Configure sync" (Phase 5). Bounty's own wording: "select which collections,
- * tags, and categories should be synced." "Categories" maps onto Zotero's item type
- * (Journal Article, Book, Document, ...) — `client.listItemTypes()`.
+ * "Zotero: Configure sync": select which collections, tags, and categories should be
+ * synced. "Categories" maps onto Zotero's item type (Journal Article, Book, Document,
+ * ...) — `client.listItemTypes()`.
  *
  * CONFIRMED LIVE, 2026-09-07: `app.prompt`'s `checkbox` input type is a single ON/OFF
- * toggle — it does NOT take an `options` array the way `select` does (Phase 0 spike #4).
+ * toggle — it does NOT take an `options` array the way `select` does
+ * (zotero-findings.md, spike #4).
  * Declaring one checkbox input labeled "Collections" with an `options` array rendered as
  * exactly one checkbox named "Collections", the array silently ignored. So this declares
  * one checkbox input PER selectable name (prefixed "Collection: "/"Tag: "/"Category: "

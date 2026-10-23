@@ -2,7 +2,7 @@
  * Shared heading/section utilities, used anywhere this plugin persists or updates a
  * fenced-off part of a note without touching the rest (api-notes.md #4/#4b): the
  * "Zotero Sync" bookkeeping note (sync-state.js) and each synced item's "Highlights &
- * Notes" section (Phase 4, actions/sync-library.js).
+ * Notes" section (actions/sync-library.js).
  */
 
 export function countHeadingOccurrences(content, headingText) {

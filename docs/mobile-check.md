@@ -1,4 +1,4 @@
-# Mobile check — Phase 6
+# Mobile check
 
 The plugin registers **no embed**, which is what broke on mobile for the PDF Annotator
 (`api-notes.md` #13: embeds render, but the host note claims the vertical drag gesture and

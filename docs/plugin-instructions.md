@@ -6,7 +6,7 @@ someone who has never seen the plugin, not for a contributor — contributor-fac
 stays in `README.md` and `docs/`.
 
 Behavior described here is drawn from the code and from live runs recorded in
-`docs/development.md` (per phase) and `docs/mobile-check.md`. One point rests on Zotero's
+`docs/development.md` and `docs/mobile-check.md`. One point rests on Zotero's
 own key page rather than a test here: which permission boxes to tick. If a behavior
 changes, fix it here too.
 

@@ -4,7 +4,7 @@ import { connect } from "../setup.js";
 
 /**
  * Proves the API client works against the user's own key and library — the live-app
- * check every phase ends with (CLAUDE.md). With no key saved yet, `connect` asks for one
+ * check every change ends with (CLAUDE.md). With no key saved yet, `connect` asks for one
  * and checks it itself, so this reports that same answer instead of asking again.
  */
 export async function testConnection(app) {

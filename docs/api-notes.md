@@ -864,7 +864,7 @@ several of these cost real debugging time (or a live, reported bug) on this one.
     out deterministically.
 
     **Consequence for any plugin that keeps its own note -> uuid mapping** (this project's
-    Phase 3/4 sync bookkeeping is exactly this shape): storing the `createNote` return
+    sync bookkeeping is exactly this shape): storing the `createNote` return
     value once and reusing it forever is not safe. Before writing to a remembered uuid,
     confirm it still resolves (`app.findNote({ uuid })` returns non-null — cheap, and
     exactly what that method is documented to do), and if not, fall back to
@@ -970,9 +970,9 @@ on what Amplenote can store.** This is a real constraint on the persistence
 design (spec §7.4): the annotation JSON shares that budget with the user's own note
 content. Rough math — a highlight with rects plus quote text runs a few hundred bytes
 of JSON, so a heavily annotated long PDF could approach the cap. **Open design question
-for Phase 2:** keep the stored JSON compact (short keys, rounded coordinates), and
+for annotation storage:** keep the stored JSON compact (short keys, rounded coordinates), and
 decide whether the PDF's own native annotations become the source of truth with the
-note JSON as a cache. Not blocking Phase 1.
+note JSON as a cache. Not blocking the first render.
 
 **3. `replaceNoteContent` accepts `{ section: { heading: { text: "..." } } }`** and
 replaces only the content under that heading, leaving the heading itself in place. This
@@ -987,7 +987,7 @@ scratch note. These could not be answered from documentation.
 
 ### ✅ Resolved — the embed works, and CDN loading is NOT blocked
 
-The single biggest Phase 1 unknown. Inside a live embed:
+The single biggest unknown for the first working viewer. Inside a live embed:
 
 ```
 embed booted
@@ -1019,7 +1019,7 @@ PDFLIB OK
   This is the surface the annotator should use.
 - Embed parameters use **query-string syntax**:
   `plugin://UUID?page=3&x=100` arrives as `renderEmbed(app, "page=3&x=100")` — a single
-  string, not structured args. **This is the mechanism for the Phase 5 deep-link** (§7.3),
+  string, not structured args. **This is the mechanism for the deep-link feature** (§7.3),
   so design the link format around a query string.
 
 ### ✅ Attachment object shape (confirmed against a real PDF)
@@ -1065,7 +1065,7 @@ textItems=95
 sample=<real text extracted from page 1>
 ```
 
-That single run proves the entire Phase 1 render path:
+That single run proves the entire render path:
 - the proxy returns **binary** intact (`arrayBuffer`, not just text)
 - **PDF.js parses the document** — 7 pages
 - **the PDF.js worker loads** from cdnjs (page rendering would fail without it)
@@ -1141,8 +1141,8 @@ The docs only say it throws if the file is "too large, or otherwise not allowed"
 practice PDFs are not allowed. The test PDF was a valid 949-byte pdf-lib document, so
 size is not the cause.
 
-**Impact on Phase 4:** the spec's plan to upload the annotated PDF back to the note via
-`attachNoteMedia` does not work as written. Re-read §4 though — the actual bounty
+**Impact on export:** the spec's plan to upload the annotated PDF back to the note via
+`attachNoteMedia` does not work as written. Re-read §4 though — the actual
 requirement is to "offer a way to export/download the PDF with those annotations baked
 in." Download via a blob URL satisfies that; uploading back was the spec's own
 suggestion, not a requirement. Treat upload-back as dropped unless another path appears.
@@ -1179,7 +1179,7 @@ guarding this.
 
 ### PDF.js stalls in a hidden tab (not an Amplenote problem, but it looks like one)
 
-Cost real debugging time during Phase 2, and would cost it again. PDF.js drives its
+Cost real debugging time while building highlights, and would cost it again. PDF.js drives its
 canvas render task off `requestAnimationFrame`, which browsers pause in a hidden or
 non-compositing tab. The symptom is the viewer sitting on "Rendering..." forever with the
 document parsed, the canvas element sized correctly, and no error anywhere — identical to
@@ -1250,8 +1250,8 @@ and press Tab: that appends an empty row (confirmed 2026-10-23).
 | ~~"Double-quoted block" markdown~~ | — | ✅ Resolved: doc 4 confirms Amplenote has no colored-link syntax — a cycle color is markdown-native, `==highlighted text<!-- {"cycleColor": "N"} -->==` (or `backgroundCycleColor`). Original implementation wrapped the link itself in the highlight span; confirmed live that a highlight/mark span and a markdown link do NOT compose at all, in either nesting order (see "A highlight/mark span cannot contain a markdown link" below). `src/export.js` now emits a colored `==●<!-- {"cycleColor":"N"} -->==` marker immediately followed by a plain `[name](url)` link, then a `> "quote"` blockquote line — confirmed live, the marker renders in color and the link stays clickable. |
 | ~~Cycle-color indices 12/14/15/18~~ | A wrong index means every exported link is the wrong color — a visible acceptance failure. | ✅ Mechanism confirmed live: distinct marker colors visibly rendered for coral and yellow in the same export (screenshot), consistent with `src/colors.js`'s mapping. Green (15) and blue (18) weren't independently pixel-checked in that pass - worth a quick glance next time either color is exported, but the mechanism itself (not just the guessed indices) is no longer in doubt. |
 | ~~`prompt` radio input shape~~ | — | ✅ Resolved 2026-09-05 (Zotero integration project, `zotero-findings.md`). A `string` and a `select` input coexist in one `app.prompt` call; `select` renders as a real dropdown, not a degraded fallback. The return is a **positional array matching `inputs` order, plus one trailing element beyond the declared inputs** — `["thinking fast", "A", -1]` for a two-input prompt (string, select). The trailing `-1` was not requested and matches `app.alert`'s documented "`-1` for primary action" convention, so `app.prompt` appears to append an implicit action index even with no `actions` array passed. `radio` itself not separately tested — only `select` was needed and confirmed. |
-| ~~Two `select` inputs in ONE `app.prompt`~~ | — | ❌ Resolved 2026-09-07 (Zotero integration project): **only the FIRST `select` renders. The second is silently dropped** — no error, no empty control, just absent from the dialog. Confirmed live with a prompt declaring `[{label:"Reference",type:"select"},{label:"Format",type:"select"}]`: only "Reference" appeared. A `string` + a `select` DO coexist (Phase 0 spike #4), so this is specific to a second `select`, not to multi-input prompts generally. **Consequence: at most one `select` per prompt — chain a second prompt instead.** `checkbox` is unaffected (it renders one toggle per declared input, however many). See `src/actions/citation-picker.js`, which asks for the output format in its own follow-up prompt. |
-| ~~`prompt` `checkbox` input shape~~ | — | ✅ Resolved 2026-09-07 (Zotero integration project). **`checkbox` is a single ON/OFF toggle, NOT a multi-select list — it does not take an `options` array the way `select` does.** Declaring one `checkbox` input labeled "Collections" with an `options` array of several names rendered as exactly ONE checkbox named "Collections"; the `options` array was silently ignored. To offer several selectable items, declare one `checkbox` input per item (Phase 0 spike #4 already confirmed multiple inputs coexist fine in one prompt) and read the boolean result positionally. See `src/actions/configure-sync.js`. |
+| ~~Two `select` inputs in ONE `app.prompt`~~ | — | ❌ Resolved 2026-09-07 (Zotero integration project): **only the FIRST `select` renders. The second is silently dropped** — no error, no empty control, just absent from the dialog. Confirmed live with a prompt declaring `[{label:"Reference",type:"select"},{label:"Format",type:"select"}]`: only "Reference" appeared. A `string` + a `select` DO coexist (zotero-findings.md, spike #4), so this is specific to a second `select`, not to multi-input prompts generally. **Consequence: at most one `select` per prompt — chain a second prompt instead.** `checkbox` is unaffected (it renders one toggle per declared input, however many). See `src/actions/citation-picker.js`, which asks for the output format in its own follow-up prompt. |
+| ~~`prompt` `checkbox` input shape~~ | — | ✅ Resolved 2026-09-07 (Zotero integration project). **`checkbox` is a single ON/OFF toggle, NOT a multi-select list — it does not take an `options` array the way `select` does.** Declaring one `checkbox` input labeled "Collections" with an `options` array of several names rendered as exactly ONE checkbox named "Collections"; the `options` array was silently ignored. To offer several selectable items, declare one `checkbox` input per item (zotero-findings.md spike #4 already confirmed multiple inputs coexist fine in one prompt) and read the boolean result positionally. See `src/actions/configure-sync.js`. |
 
 ## Corrections log
 
@@ -1293,7 +1293,7 @@ mock that drifts from reality makes green tests meaningless.
     one). **Don't take the success alert as proof**: check the code block (see "Editing
     the plugin code block…") or the `/` actions list after a reload.
   - **`app.navigate` to a just-created `local-…` uuid works.** `createNote`'s uuid is not
-    durable (it is swapped for a permanent one later — development.md, Phase 3), but
+    durable (it is swapped for a permanent one later — development.md, content sync), but
     navigating to it immediately opened the right note.
   - **A multi-line `insertText` return keeps its line breaks.** A BibTeX entry came back
     as ONE paragraph with its `\n`s and tabs shown as typed — readable, not parsed as

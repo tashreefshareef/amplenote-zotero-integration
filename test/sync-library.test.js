@@ -328,7 +328,7 @@ describe("syncLibrary", () => {
     expect(app._calls.createdNotes).toHaveLength(0);
   });
 
-  describe("Phase 5 filtering", () => {
+  describe("sync filtering", () => {
     test("with a collections+tags filter set, routes through the filtered fetch instead of the plain one", async () => {
       const app = createMockApp({
         settings: { "Zotero API key": "k", "Zotero sync filter": "Collections: Psychology\nTags: favorite" },
@@ -399,7 +399,7 @@ describe("syncLibrary", () => {
       expect(url.searchParams.get("since")).toBe("50");
     });
 
-    test("no filter set behaves exactly like Phase 3/4 (plain items/top, no extra requests)", async () => {
+    test("no filter set behaves exactly like an unfiltered sync (plain items/top, no extra requests)", async () => {
       const app = createMockApp({ settings: { "Zotero API key": "k" } });
       const fetchImpl = mockFetchSequence(fakeResponse({ body: { userID: 1 } }), fakeResponse({ body: [] }));
 

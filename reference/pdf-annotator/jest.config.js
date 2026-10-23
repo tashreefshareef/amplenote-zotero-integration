@@ -3,7 +3,7 @@
  * That works because src/ is plain modern JS and package.json sets "type": "module";
  * the `--experimental-vm-modules` flag in the `test` script is what enables it.
  *
- * jsdom is the default environment because the embed-side code (Phase 1 onward)
+ * jsdom is the default environment because the embed-side code
  * touches the DOM. Pure action/logic tests are unaffected by it.
  */
 export default {
